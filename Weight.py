@@ -4,27 +4,24 @@ import sys
 from hx711 import HX711
 
 # 定義引腳
-DT = 5   # HX711 DT Pin
-SCK = 6  # HX711 SCK Pin
+DT_PIN = 5   # HX711 DT Pin
+SCK_PIN = 6  # HX711 SCK Pin
 
 # 設置比例因子(需要校準)
 SCALE_FACTOR = 92
 
 # 初始化函數
 def setup():
-    #
-    # 禁用警告
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
     
     print("正在初始化HX711...")
     
     # 初始化HX711
-    hx = HX711(dout_pin=DT, pd_sck_pin=SCK)
+    hx = HX711(DT_PIN, SCK_PIN)
     
-    # 列印可用方法，幫助除錯
-    available_methods = [method for method in dir(hx) if not method.startswith('_')]
-    print("可用方法:", available_methods)
+    # 列印方法清單，幫助除錯
+    print("HX711 方法:", dir(hx))
     
     return hx
 
