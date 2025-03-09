@@ -65,24 +65,32 @@ def close_gate():
     smooth_servo_move(pwm, OPEN_DUTY, CLOSE_DUTY)
     print("✅ 門已完全關閉")
 
+# 初始化伺服馬達的函數
+def initialize_servo():
+    global pwm  # 宣告 pwm 為全域變數
+    # 初始化GPIO（如果還沒初始化過）
+    GPIO.setmode(GPIO.BOARD)  # 使用實體板上的腳位編號
+    GPIO.setup(SERVO_PIN, GPIO.OUT)  # 設定伺服馬達腳位為輸出模式
+    
+    # 創建並啟動PWM
+    pwm = GPIO.PWM(SERVO_PIN, FREQ)  # 建立PWM物件，頻率為50Hz
+    pwm.start(0)  # 啟動PWM，初始佔空比為0
+    
+    # 確保開始時閘門關閉
+    print("初始化伺服馬達...")
+    pwm.ChangeDutyCycle(CLOSE_DUTY)  # 設定為關門位置
+    time.sleep(1)  # 等待1秒讓馬達到位
+    pwm.ChangeDutyCycle(0)  # 停止PWM輸出以防止抖動
+
 # 主程式
 def main():
     try:
-        # 初始化GPIO
-        GPIO.setmode(GPIO.BOARD)  # 使用實體板上的腳位編號
-        GPIO.setup(SERVO_PIN, GPIO.OUT)  # 設定伺服馬達腳位為輸出模式
-        
-        # 創建並啟動PWM
-        global pwm
-        pwm = GPIO.PWM(SERVO_PIN, FREQ)  # 建立PWM物件，頻率為50Hz
-        pwm.start(0)  # 啟動PWM，初始佔空比為0
-        
-        # 確保開始時閘門關閉
-        print("初始化伺服馬達...")
-        pwm.ChangeDutyCycle(CLOSE_DUTY)  # 設定為關門位置
-        time.sleep(1)  # 等待1秒讓馬達到位
-        pwm.ChangeDutyCycle(0)  # 停止PWM輸出以防止抖動
-        
+        # 等待用戶按下任意鍵來初始化伺服馬達
+        input("按下 Enter 鍵來初始化伺服馬達...")
+
+        # 初始化伺服馬達
+        initialize_servo()
+
         while True:
             # 開門
             open_gate()  # 呼叫開門函數
