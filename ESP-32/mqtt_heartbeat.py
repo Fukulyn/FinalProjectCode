@@ -120,7 +120,7 @@ def calculate_heart_rate(ir_samples, time_elapsed):
 class InitWifi():
     def __init__(self):
         self.ssid = 'S24Ultra'
-        self.passwd = '0909025146++-'
+        self.passwd = '0909025146'
         self.run()
     
     def run(self):
