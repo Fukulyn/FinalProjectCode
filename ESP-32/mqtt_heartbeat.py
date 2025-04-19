@@ -120,7 +120,7 @@ def calculate_heart_rate(ir_samples, time_elapsed):
 class InitWifi():
     def __init__(self):
         self.ssid = 'S24Ultra'
-        self.passwd = '0909025146++-'
+        self.passwd = '0909025146'
         self.run()
     
     def run(self):
@@ -143,10 +143,10 @@ class InitMqtt():
     def __init__(self):
         self.host = "broker.emqx.io"
         self.port = 1883
-        self.topic = "esp_test"
+        self.topic = "pet/manager/topic/collar"
         self.client_id = f'esp-p-{random.randint(0, 1000)}'
-        self.user = "host001"
-        self.pwd = "0000"
+        self.user = "petmanager"
+        self.pwd = "petmanager"
         
         print("初始化 MAX30102...")
         init_max30102()
