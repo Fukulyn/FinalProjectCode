@@ -10,6 +10,7 @@ SCK_PIN = 26  # HX711 SCK Pin
 # 設置比例因子(需要校準)
 SCALE_FACTOR = 99
 
+
 # 初始化函數
 def setup():
     GPIO.setwarnings(False)
