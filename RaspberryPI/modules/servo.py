@@ -26,7 +26,7 @@ def init_servo():
     global pwm
     pwm = GPIO.PWM(SERVO_PIN, SERVO_FREQUENCY)
     pwm.start(0)
-    print("🔧 伺服馬達已初始化")
+    print("伺服馬達已初始化")
 
 def feed(angle=45):
     """
@@ -46,7 +46,7 @@ def feed(angle=45):
 
     # 線性映射到佔空比
     duty = SERVO_MIN_DUTY + (angle / 180.0) * (SERVO_MAX_DUTY - SERVO_MIN_DUTY)
-    print(f"🔄 伺服轉動 → 角度: {angle:.1f}° | DutyCycle: {duty:.2f}%")
+    print(f"伺服轉動 → 角度: {angle:.1f}° | DutyCycle: {duty:.2f}%")
 
     # 發送 PWM
     pwm.ChangeDutyCycle(duty)
@@ -55,5 +55,5 @@ def feed(angle=45):
 
     # 計算估算餵食量
     grams = round(angle * ANGLE_TO_GRAM, 2)
-    print(f"✅ 餵食完成：{grams} g @ {datetime.now().isoformat()}")
+    print(f"餵食完成：{grams} g @ {datetime.now().isoformat()}")
     return grams

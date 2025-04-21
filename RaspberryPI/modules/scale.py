@@ -62,8 +62,8 @@ def calibrate_weight():
         raw_avg = sum(raw[2:-2]) / len(raw[2:-2])  # 去頭尾後平均
         REFERENCE_UNIT = raw_avg / known
         hx.set_reference_unit(REFERENCE_UNIT)
-        print(f"✅ 新比例因子：{REFERENCE_UNIT:.2f} ADC/g")
+        print(f"新比例因子：{REFERENCE_UNIT:.2f} ADC/g")
         input("移除砝碼後按 Enter 繼續...")
         hx.tare()
     except Exception as e:
-        print(f"⚠️ 校正失敗：{e}")
+        print(f"校正失敗：{e}")
