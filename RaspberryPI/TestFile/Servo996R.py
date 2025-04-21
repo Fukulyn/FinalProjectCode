@@ -2,7 +2,7 @@ import RPi.GPIO as GPIO
 import time
 
 # 伺服馬達配置
-SERVO_PIN = 11      # 伺服馬達 GPIO 腳位
+SERVO_PIN = 24      # 伺服馬達 GPIO 腳位
 FREQ = 50           # PWM 頻率 (Hz)
 OPEN_ANGLE = 90     # 開門角度
 CLOSE_ANGLE = 0     # 關門角度
