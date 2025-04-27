@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Edit2, Trash2, Clock, Bell, Calendar, Check, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Clock, Bell, Calendar, Check, X, Syringe, CheckCircle, XCircle } from 'lucide-react';
 import styled from 'styled-components';
 
 interface FormData {
@@ -23,6 +23,31 @@ interface Reminder {
   repeat_days: number[];
   pet_id?: string; // 添加 pet_id 属性，假设它是可选的
 }
+
+interface VaccineRecord {
+  id: string;
+  pet_id: string;
+  vaccine_name: string;
+  date: string;
+  next_due_date: string;
+}
+
+interface VaccineInfo {
+  name: string;
+  schedule: string;
+  purpose: string;
+}
+
+const vaccineData: VaccineInfo[] = [
+  { name: 'DHPP (犬瘟熱等)', schedule: '6-8 週、10-12 週、14-16 週，然後每 1-3 年', purpose: '預防犬瘟熱、肝炎、犬瘟、副流感等嚴重疾病' },
+  { name: '狂犬病', schedule: '12 週，然後每 1-3 年', purpose: '預防致命的狂犬病' },
+  { name: '黃熱病 (Leptospirosis)', schedule: '12 週，然後每年', purpose: '預防細菌性疾病，保護腎臟和肝臟' },
+  { name: '犬咳 (Bordetella)', schedule: '每年，如果需要', purpose: '預防呼吸道疾病，適合社交活躍的狗' },
+  { name: '萊姆病', schedule: '每年，如果在流行區域', purpose: '預防由螨蟲傳播的疾病' },
+  { name: 'FVRCP (貓鼻氣管炎等)', schedule: '6-8 週、10-12 週、14-16 週，然後每 1-3 年', purpose: '預防呼吸道和腸道疾病' },
+  { name: '貓狂犬病', schedule: '12 週，然後每 1-3 年', purpose: '預防致命的狂犬病' },
+  { name: '貓白血病 (FeLV)', schedule: '9-12 週，第二次劑量 2-4 週後，然後每年或戶外貓建議', purpose: '預防病毒性疾病，保護免疫系統' },
+];
 
 interface Day {
   value: number; // 或者 string，取决于您的需求
@@ -240,7 +265,20 @@ const Loading = styled.div`
   color: #666;
 `;
 
-// ... 保持其他狀態和函數定義不變 ...
+const updateVaccineStatus = async (recordId: string, newStatus: string) => {
+  try {
+    const { error } = await supabase
+      .from('vaccine_records')
+      .update({ status: newStatus }) // 假设您在数据库中有一个 status 字段
+      .eq('id', recordId);
+
+    if (error) throw error;
+
+    fetchVaccineRecords(); // 更新后重新获取疫苗记录
+  } catch (error) {
+    console.error('更新疫苗状态失败:', error);
+  }
+};
 
 export default function Reminders() {
   const [showForm, setShowForm] = useState(false);
@@ -256,6 +294,12 @@ export default function Reminders() {
     active: true
   });
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [records, setRecords] = useState<VaccineRecord[]>([]);
+  const [vaccineFormData, setVaccineFormData] = useState({
+    vaccine_name: '',
+    date: '',
+    next_due_date: '',
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -287,9 +331,44 @@ export default function Reminders() {
     }
   };
 
+  const fetchVaccineRecords = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vaccine_records')
+        .select('*')
+        .eq('pet_id', selectedPet)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      setRecords(data || []);
+    } catch (error) {
+      console.error('Error fetching vaccine records:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // ... 表單提交邏輯 ...
+    try {
+      const { error } = await supabase.from('vaccine_records').insert([
+        {
+          pet_id: selectedPet,
+          vaccine_name: vaccineFormData.vaccine_name,
+          date: vaccineFormData.date,
+          next_due_date: vaccineFormData.next_due_date,
+        },
+      ]);
+
+      if (error) throw error;
+
+      setVaccineFormData({
+        vaccine_name: '',
+        date: '',
+        next_due_date: '',
+      });
+      fetchVaccineRecords();
+    } catch (error) {
+      console.error('Error adding vaccine record:', error);
+    }
   };
 
   const handleDayToggle = (day: number) => {
@@ -342,6 +421,14 @@ export default function Reminders() {
     setSelectedPet(reminder.pet_id || ''); // 使用 pet_id
     setEditingId(reminder.id); // 设置当前编辑的提醒 ID
     setShowForm(true); // 显示表单以进行编辑
+  };
+
+  const checkVaccineStatus = (vaccineName: string) => {
+    const record = records.find(r => r.vaccine_name === vaccineName);
+    if (!record) return '未接種';
+    const nextDueDate = new Date(record.next_due_date);
+    const today = new Date();
+    return nextDueDate < today ? '已過期' : '正常';
   };
 
   if (loading) {
@@ -507,6 +594,110 @@ export default function Reminders() {
           ))}
         </tbody>
       </Table>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">疫苗紀錄</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  疫苗名稱
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  接種狀態
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  接種時間
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  功用
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  操作
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {records.map((record) => (
+                <tr key={record.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div className="flex items-center gap-2">
+                      <Syringe className="w-4 h-4 text-blue-500" />
+                      {record.vaccine_name}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {checkVaccineStatus(record.vaccine_name)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {new Date(record.date).toLocaleDateString('zh-TW')}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {vaccineData.find(v => v.name === record.vaccine_name)?.purpose}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <button
+                      onClick={() => updateVaccineStatus(record.id, '已接種')}
+                      className="text-green-500 hover:text-green-700"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => updateVaccineStatus(record.id, '未接種')}
+                      className="text-red-500 hover:text-red-700 ml-2"
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 新增疫苗紀錄的表單 */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">疫苗名稱</label>
+          <input
+            type="text"
+            value={vaccineFormData.vaccine_name}
+            onChange={(e) => setVaccineFormData({ ...vaccineFormData, vaccine_name: e.target.value })}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">接種日期</label>
+          <input
+            type="date"
+            value={vaccineFormData.date}
+            onChange={(e) => setVaccineFormData({ ...vaccineFormData, date: e.target.value })}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">下次接種日期</label>
+          <input
+            type="date"
+            value={vaccineFormData.next_due_date}
+            onChange={(e) => setVaccineFormData({ ...vaccineFormData, next_due_date: e.target.value })}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+        >
+          儲存疫苗紀錄
+        </button>
+      </form>
     </Container>
   );
 }
