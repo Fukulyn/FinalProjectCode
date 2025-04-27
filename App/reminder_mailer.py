@@ -8,10 +8,10 @@ import schedule
 
 # Supabase 配置
 SUPABASE_URL = "https://hkjclbdisriyqsvcpmnp.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhramNsYmRpc3JpeXFzdmNwbW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NTM1NzQsImV4cCI6MjA1NTUyOTU3NH0.kcKKU2u_FioHElJBTcV6uDVJjOL6nWDlZ0hz1r26_AQ"
+#SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhramNsYmRpc3JpeXFzdmNwbW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NTM1NzQsImV4cCI6MjA1NTUyOTU3NH0.kcKKU2u_FioHElJBTcV6uDVJjOL6nWDlZ0hz1r26_AQ"
 
 # Gmail 配置
-GMAIL_USER = "0966178691wang@gmail.com"
+#GMAIL_USER = "0966178691wang@gmail.com"
 GMAIL_PASSWORD = "leal xuie cmxj qylr"  # 需要在 Gmail 设置中生成应用专用密码
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Home, Syringe, Plus, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, VaccineRecord } from '../types';
@@ -80,6 +80,7 @@ export default function VaccineRecordPage() {
     date: '',
     next_due_date: '',
   });
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPets();
@@ -146,6 +147,7 @@ export default function VaccineRecordPage() {
       });
       setShowForm(false);
       fetchVaccineRecords();
+      navigate('/vaccine-record');
     } catch (error) {
       console.error('Error adding vaccine record:', error);
     }
@@ -389,14 +391,24 @@ export default function VaccineRecordPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="vaccine-name" className="block text-sm font-medium text-gray-700">疫苗名稱</label>
-                <input
+                <select
                   id="vaccine-name"
-                  type="text"
                   value={formData.vaccine_name}
                   onChange={(e) => setFormData({ ...formData, vaccine_name: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
-                />
+                >
+                  <option value="">選擇疫苗</option>
+                  <option value="DHPP (犬瘟熱等)">DHPP (犬瘟熱等)</option>
+                  <option value="狂犬病">狂犬病</option>
+                  <option value="黃熱病 (Leptospirosis)">黃熱病 (Leptospirosis)</option>
+                  <option value="犬咳 (Bordetella)">犬咳 (Bordetella)</option>
+                  <option value="萊姆病">萊姆病</option>
+                  <option value="FVRCP (貓鼻氣管炎等)">FVRCP (貓鼻氣管炎等)</option>
+                  <option value="貓狂犬病">貓狂犬病</option>
+                  <option value="貓白血病 (FeLV)">貓白血病 (FeLV)</option>
+                  <option value="其他">其他</option>
+                </select>
               </div>
               <div>
                 <label htmlFor="vaccination-date" className="block text-sm font-medium text-gray-700">接種日期</label>

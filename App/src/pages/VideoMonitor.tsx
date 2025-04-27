@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Home, Camera, Settings, Play, Pause, Volume2, VolumeX, 
-  Maximize2, RotateCcw, Download, Share2, AlertTriangle,
+  Maximize2, RotateCcw, Download, AlertTriangle,
   ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { VideoStream } from '../types';
@@ -12,15 +12,14 @@ export default function VideoMonitor() {
   const [activeStream, setActiveStream] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const [quality, setQuality] = useState<'1080p' | '720p' | '480p'>('1080p');
   const [motionDetected, setMotionDetected] = useState(false);
   const [recording, setRecording] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     // 模擬載入攝影機串流
@@ -231,6 +230,8 @@ export default function VideoMonitor() {
                             value={quality}
                             onChange={(e) => handleQualityChange(e.target.value as '1080p' | '720p' | '480p')}
                             className="bg-transparent text-white text-sm border border-white/30 rounded px-2 py-1"
+                            aria-label="選擇影片品質"
+                            title="選擇影片品質"
                           >
                             <option value="1080p">1080p</option>
                             <option value="720p">720p</option>
@@ -258,11 +259,21 @@ export default function VideoMonitor() {
                         </div>
                         <div>
                           <label className="text-white/80 text-sm block mb-2">對比度</label>
-                          <input type="range" className="w-full" />
+                          <input 
+                            type="range" 
+                            className="w-full" 
+                            aria-label="調整對比度"
+                            title="調整對比度"
+                          />
                         </div>
                         <div>
                           <label className="text-white/80 text-sm block mb-2">飽和度</label>
-                          <input type="range" className="w-full" />
+                          <input 
+                            type="range" 
+                            className="w-full" 
+                            aria-label="調整飽和度"
+                            title="調整飽和度"
+                          />
                         </div>
                       </div>
                     </div>

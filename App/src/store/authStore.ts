@@ -10,6 +10,7 @@ interface AuthState {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -72,5 +73,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (user) {
       startReminderCheck();
     }
+  },
+
+  resetPassword: async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://hkjclbdisriyqsvcpmnp.supabase.co/auth/v1/verify',
+    });
+    if (error) throw error;
   },
 }));

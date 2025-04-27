@@ -34,16 +34,39 @@ async function checkReminders() {
     reminders?.forEach((reminder: Reminder & { pets: { name: string } }) => {
       const scheduledTime = reminder.scheduled_time.slice(0, 5);
       if (scheduledTime === currentTime) {
-        showNotification(`${reminder.pets.name} - ${reminder.title}`, {
-          body: reminder.description || getDefaultMessage(reminder.type),
-          icon: '/logo.png',
-          tag: reminder.id,
-          requireInteraction: true,
-        });
+        showNotification(
+          `${reminder.pets.name} - ${reminder.title}`,
+          {
+            body: reminder.description || getDefaultMessage(reminder.type),
+            icon: '/logo.png',
+            badge: '/badge.png',
+            tag: reminder.id,
+            requireInteraction: true,
+            data: {
+              url: `/reminders?id=${reminder.id}`
+            }
+          }
+        );
+        
+        // 記錄提醒已執行
+        logReminderExecution(reminder.id);
       }
     });
   } catch (error) {
     console.error('Error checking reminders:', error);
+  }
+}
+
+async function logReminderExecution(reminderId: string) {
+  try {
+    await supabase.from('reminder_logs').insert([
+      {
+        reminder_id: reminderId,
+        status: 'pending',
+      },
+    ]);
+  } catch (error) {
+    console.error('Error logging reminder execution:', error);
   }
 }
 
