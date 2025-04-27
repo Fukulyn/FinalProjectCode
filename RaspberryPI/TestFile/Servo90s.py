@@ -2,7 +2,7 @@ import RPi.GPIO as GPIO
 import time
 
 # **設定 GPIO 腳位**
-SERVO_PIN = 17  # 你可以改成 12, 13, 18, 19（建議）
+SERVO_PIN = 18  # 你可以改成 12, 13, 18, 19（建議）
 FREQ = 50  # MG90S 伺服馬達使用 50Hz PWM 頻率
 
 # **初始化 GPIO**

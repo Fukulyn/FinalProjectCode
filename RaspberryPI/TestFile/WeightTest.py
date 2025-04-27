@@ -4,11 +4,12 @@ import sys
 from hx711 import HX711
 
 # 定義引腳
-DT_PIN = 5   # HX711 DT Pin
-SCK_PIN = 6  # HX711 SCK Pin
+DT_PIN = 16   # HX711 DT Pin
+SCK_PIN = 20  # HX711 SCK Pin
 
 # 設置比例因子(需要校準)
-SCALE_FACTOR = 92
+SCALE_FACTOR = 99
+
 
 # 初始化函數
 def setup():
@@ -111,7 +112,7 @@ def main():
         # 主循環
         while True:
             weight = get_weight(hx)
-            print(f"當前重量: {weight} 克", end='\r')
+            print(f"當前重量: {weight:.1f} 克", end='\r')
             time.sleep(0.5)
             
     except KeyboardInterrupt:
