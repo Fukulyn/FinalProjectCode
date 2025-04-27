@@ -109,10 +109,13 @@ export default function FeedingRecordPage() {
               </Link>
             </div>
             <div className="flex items-center gap-4">
+              <label htmlFor="pet-select" className="sr-only">選擇寵物</label>
               <select
+                id="pet-select"
                 value={selectedPet}
                 onChange={(e) => setSelectedPet(e.target.value)}
                 className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                aria-label="選擇寵物"
               >
                 {pets.map((pet) => (
                   <option key={pet.id} value={pet.id}>
@@ -194,6 +197,7 @@ export default function FeedingRecordPage() {
                   type="text"
                   value={formData.food_type}
                   onChange={(e) => setFormData({ ...formData, food_type: e.target.value })}
+                  placeholder="輸入食物類型"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
@@ -205,6 +209,7 @@ export default function FeedingRecordPage() {
                   step="0.1"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  placeholder="輸入份量"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
@@ -215,6 +220,7 @@ export default function FeedingRecordPage() {
                   type="number"
                   value={formData.calories}
                   onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
+                  placeholder="輸入熱量"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
