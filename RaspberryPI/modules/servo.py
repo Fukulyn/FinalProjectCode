@@ -5,7 +5,7 @@ from datetime import datetime
 import RPi.GPIO as GPIO
 
 # --- 常數設定 ---
-SERVO_PIN        = 24     # BCM 腳位
+SERVO_PIN        = 21     # BCM 腳位
 SERVO_FREQUENCY  = 50     # Hz
 SERVO_MIN_DUTY   = 2.5    # 0° 對應佔空比
 SERVO_MAX_DUTY   = 12.5   # 180° 對應佔空比

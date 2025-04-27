@@ -6,8 +6,8 @@ from statistics import median
 from hx711 import HX711
 
 # 引腳與參數設置
-DT_PIN = 19  # HX711 DT Pin
-SCK_PIN = 26  # HX711 SCK Pin
+DT_PIN = 16  # HX711 DT Pin
+SCK_PIN = 20  # HX711 SCK Pin
 REFERENCE_UNIT = 99  # 可從校正寫入設定檔
 
 hx = None  # 全域 HX711 物件
@@ -33,7 +33,7 @@ def get_realtime_weight():
     except:
         return 0.0
 
-def get_filtered_weight(samples=20):
+def get_filtered_weight(samples=25):
     """讀取多筆數據並進行中位數濾波"""
     readings = []
     for _ in range(samples):

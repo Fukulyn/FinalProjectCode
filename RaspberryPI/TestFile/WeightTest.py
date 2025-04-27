@@ -4,8 +4,8 @@ import sys
 from hx711 import HX711
 
 # 定義引腳
-DT_PIN = 19   # HX711 DT Pin
-SCK_PIN = 26  # HX711 SCK Pin
+DT_PIN = 16   # HX711 DT Pin
+SCK_PIN = 20  # HX711 SCK Pin
 
 # 設置比例因子(需要校準)
 SCALE_FACTOR = 99

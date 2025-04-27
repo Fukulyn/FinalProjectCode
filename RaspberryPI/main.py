@@ -73,7 +73,7 @@ def main_menu():
             try:
                 while True:
                     # 取即時重量與高度
-                    w = get_realtime_weight()
+                    w = get_filtered_weight()
                     cm, mm = get_realtime_distance()
                     # 覆蓋同一行顯示
                     print(f"重量：{w:.1f} g  |  高度：{cm} cm ({mm} mm)",
