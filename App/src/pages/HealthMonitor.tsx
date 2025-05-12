@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Plus, Loader2, Heart, Activity, LineChart } from 'lucide-react';
+import { Home, Plus, Loader2, Heart, Activity, LineChart, BatteryCharging } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, HealthRecord } from '../types';
 import {
@@ -37,6 +37,8 @@ export default function HealthMonitor() {
     heart_rate: '',
     oxygen_level: '',
   });
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [stepsValue, setStepsValue] = useState<number | null>(null);
   const location = useLocation();
 
   useEffect(() => {
@@ -55,6 +57,14 @@ export default function HealthMonitor() {
       fetchHealthRecords();
     }
   }, [selectedPet, timeRange]);
+
+  useEffect(() => {
+    fetchBatteryLevel();
+  }, [selectedPet]);
+
+  useEffect(() => {
+    fetchStepsValue();
+  }, [selectedPet]);
 
   const fetchPets = async () => {
     try {
@@ -99,6 +109,40 @@ export default function HealthMonitor() {
       setRecords(data || []);
     } catch (error) {
       console.error('Error fetching health records:', error);
+    }
+  };
+
+  const fetchBatteryLevel = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('health_records')
+        .select('power')
+        .eq('pet_id', selectedPet)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+      setBatteryLevel(data?.power || null);
+    } catch (error) {
+      console.error('Error fetching battery level:', error);
+    }
+  };
+
+  const fetchStepsValue = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('health_records')
+        .select('steps_value')
+        .eq('pet_id', selectedPet)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+      setStepsValue(data?.steps_value || null);
+    } catch (error) {
+      console.error('Error fetching steps value:', error);
     }
   };
 
@@ -363,6 +407,32 @@ export default function HealthMonitor() {
             <p className="text-sm text-gray-500 mt-2">
               最後更新：{latestRecord?.recorded_at ? 
                 new Date(latestRecord.recorded_at).toLocaleString('zh-TW') : '--'}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <BatteryCharging className="w-6 h-6 text-green-500" />
+              <h2 className="text-lg font-semibold">項圈電量</h2>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">
+              {batteryLevel !== null ? `${batteryLevel}%` : '--'}
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              {batteryLevel !== null ? `電量狀態：${batteryLevel > 20 ? '正常' : '低電量'}` : '尚無電量資料'}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Activity className="w-6 h-6 text-blue-500" />
+              <h2 className="text-lg font-semibold">步數</h2>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">
+              {stepsValue !== null ? `${stepsValue} 步` : '--'}
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              {stepsValue !== null ? '最新步數資料' : '尚無步數資料'}
             </p>
           </div>
         </div>

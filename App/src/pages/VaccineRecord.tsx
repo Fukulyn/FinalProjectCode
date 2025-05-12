@@ -103,6 +103,7 @@ export default function VaccineRecordPage() {
       setPets(data || []);
       if (data && data.length > 0) {
         setSelectedPet(data[0].id);
+        checkVaccineReminders(data);
       }
       setLoading(false);
     } catch (error) {
@@ -174,6 +175,29 @@ export default function VaccineRecordPage() {
     } catch (error) {
       console.error('更新疫苗狀態失敗:', error);
     }
+  };
+
+  const checkVaccineReminders = (pets: Pet[]) => {
+    pets.forEach(pet => {
+      const birthDate = new Date(pet.birth_date);
+      const ageInWeeks = Math.floor((new Date().getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+      
+      vaccineData.forEach(vaccine => {
+        const scheduleWeeks = getVaccineScheduleInWeeks(vaccine.schedule);
+        if (ageInWeeks >= scheduleWeeks) {
+          sendEmailReminder(pet.owner_email, vaccine.name);
+        }
+      });
+    });
+  };
+
+  const sendEmailReminder = (email: string, vaccineName: string) => {
+    console.log(`發送提醒郵件給 ${email}，疫苗名稱：${vaccineName}`);
+  };
+
+  const getVaccineScheduleInWeeks = (schedule: string): number => {
+    const weeks = schedule.match(/\d+/g)?.map(Number);
+    return weeks ? Math.min(...weeks) : 0;
   };
 
   if (loading) {
