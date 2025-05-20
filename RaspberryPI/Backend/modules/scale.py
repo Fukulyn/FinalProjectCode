@@ -6,8 +6,8 @@ from statistics import median
 from hx711 import HX711
 
 # 引腳與參數設置
-DT_PIN = 16  # HX711 DT Pin
-SCK_PIN = 20  # HX711 SCK Pin
+DT_PIN = 23  # HX711 DT Pin
+SCK_PIN = 24  # HX711 SCK Pin
 REFERENCE_UNIT = 99  # 可從校正寫入設定檔
 
 hx = None  # 全域 HX711 物件

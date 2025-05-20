@@ -61,12 +61,9 @@ def main_menu():
             init_sensor()
 
         elif choice == '1':
-            try:
-                ang = int(input("請輸入角度 (預設 45°)：") or 45)
-            except ValueError:
-                ang = 90
-            print(f"執行餵食：角度 {ang}°")
-            feed(ang)
+            print("執行餵食:固定90度")
+            from modules.servo import feed
+            feed()
 
         elif choice == '2':
             print("即時顯示中，按 Enter 停止...")
