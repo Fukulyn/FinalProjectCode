@@ -8,7 +8,7 @@ servo_mqtt_test.py：獨立測試伺服馬達控制並透過 MQTT 上傳餵食�
 import time
 import json
 import paho.mqtt.client as mqtt
-from modules.servo import init_servo, feed
+from servo import init_servo, feed
 
 # MQTT 設定
 MQTT_BROKER_URL = "broker.emqx.io"

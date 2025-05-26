@@ -13,8 +13,8 @@ GPIO.setup(SERVO_PIN, GPIO.OUT)
 pwm = GPIO.PWM(SERVO_PIN, FREQ)  # PWM 頻率 50Hz
 pwm.start(0)  # 初始狀態，避免抖動
 
-pwm.ChangeDutyCycle(7.74) # left -90 deg position
-time.sleep(0.5)
+pwm.ChangeDutyCycle(7.76) # left -90 deg position
+time.sleep(5.5)
 #pwm.ChangeDutyCycle(7.5) # neutral position
 #time.sleep(1)
 #pwm.ChangeDutyCycle(10) # right +90 deg position

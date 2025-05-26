@@ -54,6 +54,7 @@ def main_menu():
         print("3) 校正重量比例")
         print("4) 校正距離比例")
         print("5) 退出程式")
+        print("6) 客製化餵食（輸入目標重量）")
         choice = input("請輸入選項 (0-5)：").strip()
 
         if choice == '0':
@@ -93,7 +94,13 @@ def main_menu():
         elif choice == '5':
             print("正在退出，88～")
             break
-
+        elif choice == '6':
+            try:
+                grams = float(input("請輸入目標餵食重量（克）："))
+                from modules.servo import feed_until_weight
+                feed_until_weight(grams)
+            except ValueError:
+                print("❌ 請輸入有效數字")
         else:
             print("無效選項，請輸入 0 到 5 之間的數字！")
 

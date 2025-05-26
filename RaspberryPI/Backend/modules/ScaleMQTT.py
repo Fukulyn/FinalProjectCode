@@ -8,7 +8,7 @@ weight_mqtt_test.py：獨立測試電子秤即時重量資料並透過 MQTT 上�
 import time
 import json
 import paho.mqtt.client as mqtt
-from modules.scale import init_scale, get_realtime_weight
+from scale import init_scale, get_realtime_weight
 
 # MQTT 設定
 MQTT_BROKER_URL = "broker.emqx.io"
