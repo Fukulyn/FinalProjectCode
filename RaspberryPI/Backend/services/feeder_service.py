@@ -1,16 +1,37 @@
-from modules.servo import feed
+from modules.servo import feed, feed_until_weight
+from modules.sensor_dual import get_dual_distance
 from modules.scale import get_filtered_weight
-from RaspberryPI.Backend.Archive.sensor import get_realtime_distance
-from utils.mqtt_handler import publish_feed_log
-import time
+from datetime import datetime
 
-def do_feed(angle):
-    grams = feed(angle)
-    publish_feed_log(grams)
-    return grams
+def feed_once():
+    grams = feed()
+    h1, h2 = get_dual_distance()
+    return {
+        "status": "fed",
+        "grams": grams,
+        "height_feed": h2,
+        "height_waste": h1
+    }
 
-def get_weight():
-    return get_filtered_weight()
+def feed_until_target(target_grams):
+    feed_until_weight(target_grams)
+    h1, h2 = get_dual_distance()
+    final = get_filtered_weight()
+    return {
+        "status": "fed_until",
+        "target": target_grams,
+        "actual": final,
+        "height_feed": h2,
+        "height_waste": h1
+    }
 
-def get_distance():
-    return get_realtime_distance()
+def check_status():
+    grams = get_filtered_weight()
+    h1, h2 = get_dual_distance()
+    return {
+        "status": "status",
+        "grams": grams,
+        "height_feed": h2,
+        "height_waste": h1,
+        "timestamp": datetime.now().isoformat()
+    }

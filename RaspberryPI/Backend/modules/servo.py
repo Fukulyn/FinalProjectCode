@@ -54,7 +54,7 @@ def feed_until_weight(target_grams, max_loops=20):
             break
 
         pwm.ChangeDutyCycle(FIXED_DUTY)
-        time.sleep(2)
+        time.sleep(5)
         pwm.ChangeDutyCycle(0)
         time.sleep(2)
 
