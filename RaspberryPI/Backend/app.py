@@ -4,7 +4,7 @@ from routes.feeder_route import feeder_bp
 from routes.auth_route import auth_bp
 from config import Config
 from modules.scale import init_scale
-from modules.sensor import init_sensor
+from RaspberryPI.Backend.Archive.sensor import init_sensor
 from modules.servo import init_servo
 from utils.mqtt_handler import init_mqtt
 

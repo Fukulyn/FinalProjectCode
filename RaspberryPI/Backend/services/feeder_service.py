@@ -1,6 +1,6 @@
 from modules.servo import feed
 from modules.scale import get_filtered_weight
-from modules.sensor import get_realtime_distance
+from RaspberryPI.Backend.Archive.sensor import get_realtime_distance
 from utils.mqtt_handler import publish_feed_log
 import time
 

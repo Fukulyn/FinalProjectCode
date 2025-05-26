@@ -29,9 +29,10 @@ from modules.scale import (
     get_realtime_weight,
     calibrate_weight
 )
-from modules.sensor import (
-    init_sensor,
-    get_realtime_distance,
+from modules.sensor_dual import (
+    init_dual_sensor,
+    get_dual_distance,
+    stop_dual_sensor,
     calibrate_distance
 )
 from modules.servo import init_servo, feed, pwm
@@ -43,7 +44,7 @@ def main_menu():
     # 一開始初始化伺服／秤重／感測
     init_servo()
     init_scale()
-    init_sensor()
+    init_dual_sensor()
 
     while True:
         print("\n===== 智慧餵食器 操作選單 =====")
@@ -58,7 +59,7 @@ def main_menu():
         if choice == '0':
             print("執行去皮與感測器重啟...")
             init_scale()
-            init_sensor()
+            init_dual_sensor()
 
         elif choice == '1':
             print("執行餵食:固定90度")
@@ -71,10 +72,10 @@ def main_menu():
                 while True:
                     # 取即時重量與高度
                     w = get_filtered_weight()
-                    cm, mm = get_realtime_distance()
+                    cm1, cm2 = get_dual_distance()
                     # 覆蓋同一行顯示
-                    print(f"重量：{w:.1f} g  |  高度：{cm} cm ({mm} mm)",
-                          end='\r', flush=True)
+                    print(f"重量：{w:.1f} g | 廚餘高度：{cm1:.1f} mm | 飼料高度：{cm2:.1f} mm",
+                           end='\r', flush=True)
                     # 0.2 秒刷新
                     if select.select([sys.stdin], [], [], 0.2)[0]:
                         sys.stdin.readline()
@@ -103,3 +104,4 @@ if __name__ == '__main__':
         pwm.stop()
         GPIO.cleanup()
         print("資源清理完成，程式結束")
+        stop_dual_sensor()

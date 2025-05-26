@@ -8,7 +8,7 @@ distance_mqtt_test.py：獨立測試 VL53L1X 距離感測資料 MQTT 上傳
 import time
 import json
 import paho.mqtt.client as mqtt
-from modules.sensor import init_sensor, get_realtime_distance
+from RaspberryPI.Backend.Archive.sensor import init_sensor, get_realtime_distance
 
 # MQTT 設定
 MQTT_BROKER_URL = "broker.emqx.io"
