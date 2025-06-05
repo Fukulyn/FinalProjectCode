@@ -290,3 +290,6 @@ Werkzeug==2.2.2
 wrapt==1.14.1
 yarl==1.9.4
 zipp==1.0.0
+Flask==3.1.0
+flask-cors==5.0.1
+Flask-MQTT==1.2.1
