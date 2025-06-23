@@ -5,7 +5,7 @@ import RPi.GPIO as GPIO
 # --- 常數設定 ---
 SERVO_PIN       = 5       # 可依實際腳位調整
 SERVO_FREQUENCY = 50      # MG90S 建議 50Hz
-FIXED_DUTY      = 7.76   # 固定 DutyCycle
+FIXED_DUTY      = 2.5  # 固定 DutyCycle 7.76 
 ESTIMATED_GRAM  = 5.0     # 假設每次餵這樣的克數（可自訂）
 
 # PWM 物件
