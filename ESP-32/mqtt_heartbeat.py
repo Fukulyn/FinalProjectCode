@@ -5,6 +5,7 @@ import time
 import sys
 import random
 from umqtt.simple import MQTTClient
+import machine
 
 # 初始化 I2C
 i2c = I2C(0, scl=Pin(44), sda=Pin(43), freq=400000)
