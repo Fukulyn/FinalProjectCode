@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Camera, Battery, Wifi, Plus, Loader2, Bluetooth, X } from 'lucide-react';
+import { Home, Camera, Battery, Wifi, Loader2, Bluetooth, X } from 'lucide-react';
 import { Device } from '../types';
 
 interface BluetoothDevice {
@@ -232,6 +232,8 @@ export default function DeviceManager() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold">搜尋到的設備</h2>
                 <button 
+                  type="button"
+                  aria-label="關閉搜尋視窗"
                   onClick={() => {
                     setShowPairing(false);
                     setFoundDevices([]);

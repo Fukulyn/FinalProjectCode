@@ -29,6 +29,8 @@ def store_health_record(payload):
             'temperature': data.get('temperature'),
             'heart_rate': data.get('heart_rate'),
             'oxygen_level': data.get('oxygen_level'),
+            'power': data.get('power'),
+            'steps_value': data.get('steps_value'),
             'recorded_at': datetime.now().isoformat()
         }
         

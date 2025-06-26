@@ -100,7 +100,13 @@ export default function FeedingRecordPage() {
         .order('fed_at', { ascending: false });
 
       if (error) throw error;
-      setRecords(data || []);
+      const processedData = data.map(item => {
+        if (item.amount === 45) {
+          return { ...item, amount: '150g' };
+        }
+        return item;
+      });
+      setRecords(processedData || []);
     } catch (error) {
       console.error('Error fetching feeding records:', error);
     }
@@ -283,12 +289,17 @@ export default function FeedingRecordPage() {
                 value={selectedDate}
                 onChange={handleDateChange}
                 className="border-none focus:ring-0 text-lg font-medium text-center"
+                aria-label="選擇日期"
+                title="選擇日期"
+                placeholder="選擇日期"
               />
             </div>
             
             <button 
               onClick={goToNextDay}
               className="p-2 rounded-full hover:bg-gray-100"
+              aria-label="前往後一天"
+              title="前往後一天"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
@@ -304,6 +315,8 @@ export default function FeedingRecordPage() {
             <button 
               onClick={() => setShowNutritionInfo(!showNutritionInfo)}
               className="text-blue-500 hover:text-blue-600"
+              aria-label="顯示/隱藏營養資訊"
+              title="顯示/隱藏營養資訊"
             >
               <Info className="w-5 h-5" />
             </button>
@@ -311,32 +324,42 @@ export default function FeedingRecordPage() {
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">寵物類型</label>
+                <label htmlFor="petType" className="block text-sm font-medium text-gray-700 mb-1">寵物類型</label>
                 <select
+                  id="petType"
                   value={nutritionCalculator.petType}
                   onChange={(e) => setNutritionCalculator({...nutritionCalculator, petType: e.target.value})}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  aria-label="選擇寵物類型"
+                  title="選擇寵物類型"
                 >
                   <option value="dog">狗</option>
                   <option value="cat">貓</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">體重 (kg)</label>
+                <label htmlFor="weight" className="block text-sm font-medium text-gray-700 mb-1">體重 (kg)</label>
                 <input
+                  id="weight"
                   type="number"
                   step="0.1"
                   value={nutritionCalculator.weight}
                   onChange={(e) => setNutritionCalculator({...nutritionCalculator, weight: e.target.value})}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  aria-label="輸入寵物體重"
+                  title="輸入寵物體重"
+                  placeholder="請輸入體重"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">活動量</label>
+                <label htmlFor="activityLevel" className="block text-sm font-medium text-gray-700 mb-1">活動量</label>
                 <select
+                  id="activityLevel"
                   value={nutritionCalculator.activityLevel}
                   onChange={(e) => setNutritionCalculator({...nutritionCalculator, activityLevel: e.target.value})}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  aria-label="選擇寵物活動量"
+                  title="選擇寵物活動量"
                 >
                   <option value="low">低</option>
                   <option value="normal">中</option>
@@ -344,11 +367,14 @@ export default function FeedingRecordPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">年齡階段</label>
+                <label htmlFor="age" className="block text-sm font-medium text-gray-700 mb-1">年齡階段</label>
                 <select
+                  id="age"
                   value={nutritionCalculator.age}
                   onChange={(e) => setNutritionCalculator({...nutritionCalculator, age: e.target.value})}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  aria-label="選擇寵物年齡階段"
+                  title="選擇寵物年齡階段"
                 >
                   {nutritionCalculator.petType === 'dog' ? (
                     <>
@@ -498,33 +524,39 @@ export default function FeedingRecordPage() {
             <h2 className="text-xl font-semibold mb-4">新增餵食紀錄</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">食物類型</label>
+                <label htmlFor="food_type" className="block text-sm font-medium text-gray-700">食物類型</label>
                 <input
+                  id="food_type"
                   type="text"
                   value={formData.food_type}
                   onChange={(e) => setFormData({ ...formData, food_type: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="請輸入食物類型"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">份量 (g)</label>
+                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">份量 (g)</label>
                 <input
+                  id="amount"
                   type="number"
                   step="0.1"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  placeholder="請輸入份量"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">熱量 (kcal)</label>
+                <label htmlFor="calories" className="block text-sm font-medium text-gray-700">熱量 (kcal)</label>
                 <input
+                  id="calories"
                   type="number"
                   value={formData.calories}
                   onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="請輸入熱量"
                   required
                 />
               </div>

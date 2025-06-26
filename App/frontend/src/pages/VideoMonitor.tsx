@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Home, Camera, Settings, Play, Pause, Volume2, VolumeX, 
@@ -6,8 +6,55 @@ import {
   ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { VideoStream } from '../types';
+import JSMpeg from 'jsmpeg';
+
+// 全局聲明 JSMpeg
+declare global {
+  interface Window {
+    JSMpeg: {
+      Player: new (
+        source: WebSocket | string,
+        options?: {
+          canvas?: HTMLCanvasElement;
+          autoplay?: boolean;
+          audio?: boolean;
+          loop?: boolean;
+          onPlay?: () => void;
+          onPause?: () => void;
+          onStalled?: () => void;
+          onError?: () => void;
+        }
+      ) => {
+        play: () => void;
+        pause: () => void;
+        stop: () => void;
+        destroy: () => void;
+        volume: number;
+        levels: {
+          current: number;
+          peak: number;
+        };
+      };
+    };
+  }
+}
+
+type JSMpegPlayer = {
+  play: () => void;
+  pause: () => void;
+  stop: () => void;
+  destroy: () => void;
+  volume: number;
+  levels: {
+    current: number;
+    peak: number;
+  };
+};
 
 export default function VideoMonitor() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const playerRef = useRef<JSMpegPlayer | null>(null);
   const [streams, setStreams] = useState<VideoStream[]>([]);
   const [activeStream, setActiveStream] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
@@ -20,33 +67,48 @@ export default function VideoMonitor() {
   const [recording, setRecording] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // 模擬載入攝影機串流
-    setTimeout(() => {
-      setStreams([
-        {
-          id: '1',
-          device_id: '1',
-          name: '客廳攝影機',
-          url: 'https://example.com/stream1',
-          status: 'active',
-          resolution: '1080p',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          device_id: '2',
-          name: '寵物房攝影機',
-          url: 'https://example.com/stream2',
-          status: 'active',
-          resolution: '1080p',
-          created_at: new Date().toISOString()
+    try {
+      // 等待 JSMpeg 加載
+      const checkJSMpeg = setInterval(() => {
+        if (window.JSMpeg) {
+          clearInterval(checkJSMpeg);
+          console.log('JSMpeg 已加載，開始初始化串流');
+          
+          setTimeout(() => {
+            setStreams([
+              {
+                id: '1',
+                device_id: '1',
+                name: 'Tapo C200',
+                url: 'rtsp://wang1567:15671567@192.168.137.75:554/stream1',
+                status: 'active',
+                resolution: '1080p',
+                created_at: new Date().toISOString()
+              }
+            ]);
+            setActiveStream('1');
+            setLoading(false);
+          }, 1500);
         }
-      ]);
-      setActiveStream('1');
+      }, 100);
+
+      // 5 秒後如果還沒加載就停止檢查
+      setTimeout(() => {
+        clearInterval(checkJSMpeg);
+        if (!window.JSMpeg) {
+          setError('JSMpeg 加載超時，請刷新頁面重試');
+          setLoading(false);
+        }
+      }, 5000);
+
+    } catch (err) {
+      setError(`載入攝影機串流時發生錯誤: ${err instanceof Error ? err.message : '未知錯誤'}`);
       setLoading(false);
-    }, 1500);
+    }
 
     // 模擬動態偵測
     const motionInterval = setInterval(() => {
@@ -54,15 +116,111 @@ export default function VideoMonitor() {
       setMotionDetected(shouldDetect);
     }, 5000);
 
-    return () => clearInterval(motionInterval);
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      if (playerRef.current) {
+        playerRef.current.destroy();
+      }
+      clearInterval(motionInterval);
+    };
   }, []);
 
+  useEffect(() => {
+    if (activeStream && canvasRef.current) {
+      const stream = streams.find(s => s.id === activeStream);
+      if (stream) {
+        initializeStream(stream.url);
+      }
+    }
+  }, [activeStream, streams]);
+
+  const initializeStream = (rtspUrl: string) => {
+    // 關閉現有的連接
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+    if (playerRef.current) {
+      playerRef.current.destroy();
+    }
+
+    // 從 URL 中提取攝影機 ID
+    const cameraId = rtspUrl.includes('camera1') ? 'camera1' : 'camera2';
+    const wsPort = cameraId === 'camera1' ? 8081 : 8082;
+
+    // 建立 WebSocket 連接
+    const wsUrl = `ws://localhost:${wsPort}`;
+    console.log('正在連接到 WebSocket:', wsUrl);
+    
+    try {
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log('WebSocket 連接已建立');
+        setError(null);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket 錯誤:', error);
+        setError('串流連接失敗');
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket 連接已關閉');
+      };
+
+      // 初始化 JSMpeg 播放器
+      if (canvasRef.current) {
+        console.log('正在初始化 JSMpeg 播放器');
+        const player = new JSMpeg.Player(ws, {
+          canvas: canvasRef.current,
+          autoplay: true,
+          audio: !muted,
+          loop: false,
+          onPlay: () => {
+            console.log('播放器開始播放');
+            setIsPlaying(true);
+          },
+          onPause: () => {
+            console.log('播放器已暫停');
+            setIsPlaying(false);
+          },
+          onStalled: () => {
+            console.error('串流停滯');
+            setError('串流停滯');
+          },
+          onError: () => {
+            console.error('播放錯誤');
+            setError('播放錯誤');
+          },
+        });
+
+        wsRef.current = ws;
+        playerRef.current = player;
+      }
+    } catch (error) {
+      console.error('初始化串流時發生錯誤:', error);
+      setError('初始化串流失敗');
+    }
+  };
+
   const togglePlay = () => {
-    setIsPlaying(!isPlaying);
+    if (playerRef.current) {
+      if (isPlaying) {
+        playerRef.current.pause();
+      } else {
+        playerRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
   };
 
   const toggleMute = () => {
-    setMuted(!muted);
+    if (playerRef.current) {
+      playerRef.current.volume = muted ? 1 : 0;
+      setMuted(!muted);
+    }
   };
 
   const toggleFullscreen = () => {
@@ -82,7 +240,10 @@ export default function VideoMonitor() {
 
   const handleQualityChange = (newQuality: '1080p' | '720p' | '480p') => {
     setQuality(newQuality);
-    // 這裡可以實作切換畫質的邏輯
+    if (playerRef.current) {
+      // JSMpeg 不支援直接切換品質，這裡只是更新狀態
+      console.log(`已切換到 ${newQuality} 品質`);
+    }
   };
 
   const handleMouseMove = () => {
@@ -113,6 +274,7 @@ export default function VideoMonitor() {
               <button 
                 onClick={() => setShowSidebar(!showSidebar)}
                 className="text-gray-300 hover:text-white"
+                title={showSidebar ? "隱藏側邊欄" : "顯示側邊欄"}
               >
                 {showSidebar ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
               </button>
@@ -150,15 +312,10 @@ export default function VideoMonitor() {
                 </div>
               ) : (
                 <>
-                  <video
+                  <canvas
+                    ref={canvasRef}
                     className="w-full h-full object-cover"
-                    poster="https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&q=80"
-                    autoPlay
-                    playsInline
-                    muted={muted}
-                  >
-                    <source src="https://example.com/stream" type="video/mp4" />
-                  </video>
+                  />
 
                   {/* 動態偵測提示 */}
                   {motionDetected && (
@@ -187,6 +344,7 @@ export default function VideoMonitor() {
                         <button 
                           onClick={togglePlay}
                           className="text-white hover:text-blue-400 transition-colors"
+                          title={isPlaying ? "暫停" : "播放"}
                         >
                           {isPlaying ? (
                             <Pause className="w-6 h-6" />
@@ -197,6 +355,7 @@ export default function VideoMonitor() {
                         <button
                           onClick={toggleMute}
                           className="text-white hover:text-blue-400 transition-colors"
+                          title={muted ? "取消靜音" : "靜音"}
                         >
                           {muted ? (
                             <VolumeX className="w-6 h-6" />
@@ -209,6 +368,7 @@ export default function VideoMonitor() {
                           className={`text-white hover:text-blue-400 transition-colors ${
                             recording ? 'text-red-500' : ''
                           }`}
+                          title={recording ? "停止錄影" : "開始錄影"}
                         >
                           <span className="relative">
                             <Download className="w-6 h-6" />
@@ -220,6 +380,7 @@ export default function VideoMonitor() {
                         <button
                           onClick={() => setShowSettings(!showSettings)}
                           className="text-white hover:text-blue-400 transition-colors"
+                          title={showSettings ? "關閉設定" : "開啟設定"}
                         >
                           <Settings className="w-6 h-6" />
                         </button>
@@ -241,6 +402,7 @@ export default function VideoMonitor() {
                         <button
                           onClick={toggleFullscreen}
                           className="text-white hover:text-blue-400 transition-colors"
+                          title={isFullscreen ? "退出全螢幕" : "全螢幕"}
                         >
                           <Maximize2 className="w-6 h-6" />
                         </button>
@@ -255,15 +417,20 @@ export default function VideoMonitor() {
                       <div className="space-y-4">
                         <div>
                           <label className="text-white/80 text-sm block mb-2">亮度</label>
-                          <input type="range" className="w-full" />
+                          <input 
+                            type="range" 
+                            className="w-full" 
+                            title="調整亮度"
+                            aria-label="調整亮度"
+                          />
                         </div>
                         <div>
                           <label className="text-white/80 text-sm block mb-2">對比度</label>
                           <input 
                             type="range" 
                             className="w-full" 
-                            aria-label="調整對比度"
                             title="調整對比度"
+                            aria-label="調整對比度"
                           />
                         </div>
                         <div>
@@ -271,8 +438,8 @@ export default function VideoMonitor() {
                           <input 
                             type="range" 
                             className="w-full" 
-                            aria-label="調整飽和度"
                             title="調整飽和度"
+                            aria-label="調整飽和度"
                           />
                         </div>
                       </div>

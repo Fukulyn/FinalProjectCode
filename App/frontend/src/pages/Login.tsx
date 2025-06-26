@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Home, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { Link } from 'react-router-dom';
 import Logo from '../components/Logo';
 import { requestNotificationPermission } from '../lib/notifications';
 

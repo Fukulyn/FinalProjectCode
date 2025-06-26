@@ -207,23 +207,28 @@ export default function PetProfile() {
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">寵物名稱</label>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">寵物名稱</label>
                   <input
                     type="text"
                     name="name"
+                    id="name"
                     value={formData.name}
                     onChange={handleChange}
+                    placeholder="請輸入寵物名稱"
+                    aria-label="寵物名稱"
                     required
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">寵物類型</label>
+                  <label htmlFor="petType" className="block text-sm font-medium text-gray-700">寵物類型</label>
                   <select
+                    id="petType"
                     name="type"
                     value={formData.type}
                     onChange={handleChange}
                     required
+                    aria-label="選擇寵物類型"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   >
                     <option value="">請選擇</option>
@@ -233,32 +238,41 @@ export default function PetProfile() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">品種</label>
+                  <label htmlFor="breed" className="block text-sm font-medium text-gray-700">品種</label>
                   <input
                     type="text"
                     name="breed"
+                    id="breed"
                     value={formData.breed}
                     onChange={handleChange}
+                    placeholder="請輸入寵物品種"
+                    aria-label="寵物品種"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">出生日期</label>
+                  <label htmlFor="birth_date" className="block text-sm font-medium text-gray-700">出生日期</label>
                   <input
                     type="date"
                     name="birth_date"
+                    id="birth_date"
                     value={formData.birth_date}
                     onChange={handleChange}
+                    aria-label="寵物出生日期"
+                    placeholder="請選擇出生日期"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">體重 (kg)</label>
+                  <label htmlFor="weight" className="block text-sm font-medium text-gray-700">體重 (kg)</label>
                   <input
                     type="number"
                     name="weight"
+                    id="weight"
                     value={formData.weight}
                     onChange={handleChange}
+                    placeholder="請輸入寵物體重"
+                    aria-label="寵物體重"
                     step="0.1"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
