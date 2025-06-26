@@ -160,79 +160,87 @@ export default function Dashboard() {
       </nav>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* 提醒區塊 */}
-        {reminders.length > 0 && (
-          <div className="px-4 mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">今日提醒</h2>
-              <Link
-                to="/reminders"
-                className="text-sm text-blue-500 hover:text-blue-600"
-              >
-                查看全部
-              </Link>
-            </div>
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <div className="divide-y divide-gray-200">
-                {reminders.map((reminder) => (
-                  <div key={reminder.id} className="py-3 first:pt-0 last:pb-0">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2 rounded-lg ${
-                        reminder.type === 'feeding' ? 'bg-green-100 text-green-600' :
-                        reminder.type === 'medicine' ? 'bg-red-100 text-red-600' :
-                        reminder.type === 'cleaning' ? 'bg-yellow-100 text-yellow-600' :
-                        'bg-purple-100 text-purple-600'
-                      }`}>
-                        {getReminderIcon(reminder.type)}
+        {loading ? (
+          <div className="flex items-center justify-center min-h-[200px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          </div>
+        ) : (
+          <>
+            {/* 提醒區塊 */}
+            {reminders.length > 0 && (
+              <div className="px-4 mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">今日提醒</h2>
+                  <Link
+                    to="/reminders"
+                    className="text-sm text-blue-500 hover:text-blue-600"
+                  >
+                    查看全部
+                  </Link>
+                </div>
+                <div className="bg-white rounded-lg shadow-md p-4">
+                  <div className="divide-y divide-gray-200">
+                    {reminders.map((reminder) => (
+                      <div key={reminder.id} className="py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-center gap-4">
+                          <div className={`p-2 rounded-lg ${
+                            reminder.type === 'feeding' ? 'bg-green-100 text-green-600' :
+                            reminder.type === 'medicine' ? 'bg-red-100 text-red-600' :
+                            reminder.type === 'cleaning' ? 'bg-yellow-100 text-yellow-600' :
+                            'bg-purple-100 text-purple-600'
+                          }`}>
+                            {getReminderIcon(reminder.type)}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-sm font-medium text-gray-900">
+                              {reminder.title}
+                            </h3>
+                            <p className="text-sm text-gray-500">
+                              {getTypeText(reminder.type)} · {reminder.scheduled_time.slice(0, 5)} · {getRepeatDaysText(reminder.repeat_days)}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleComplete(reminder.id)}
+                            className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
+                          >
+                            完成
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="text-sm font-medium text-gray-900">
-                          {reminder.title}
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 功能選單 */}
+            <div className="px-4 py-6 sm:px-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {menuItems.map((item) => (
+                  <Link
+                    key={item.title}
+                    to={item.link}
+                    className="block group"
+                  >
+                    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                      <div className={`${item.color} p-4 text-white`}>
+                        {item.icon}
+                      </div>
+                      <div className="p-4">
+                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-500 transition-colors">
+                          {item.title}
                         </h3>
-                        <p className="text-sm text-gray-500">
-                          {getTypeText(reminder.type)} · {reminder.scheduled_time.slice(0, 5)} · {getRepeatDaysText(reminder.repeat_days)}
+                        <p className="mt-1 text-sm text-gray-500">
+                          {item.description}
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleComplete(reminder.id)}
-                        className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
-                      >
-                        完成
-                      </button>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
-          </div>
+          </>
         )}
-
-        {/* 功能選單 */}
-        <div className="px-4 py-6 sm:px-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {menuItems.map((item) => (
-              <Link
-                key={item.title}
-                to={item.link}
-                className="block group"
-              >
-                <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                  <div className={`${item.color} p-4 text-white`}>
-                    {item.icon}
-                  </div>
-                  <div className="p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-500 transition-colors">
-                      {item.title}
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {item.description}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
       </main>
     </div>
   );

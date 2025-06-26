@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, Plus, Loader2, Heart, Activity, LineChart, BatteryCharging } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, HealthRecord } from '../types';
+import { requestNotificationPermission, sendNotification } from '../lib/firebase';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -41,6 +42,35 @@ export default function HealthMonitor() {
   const [stepsValue, setStepsValue] = useState<number | null>(null);
   const location = useLocation();
 
+  const getHealthStatus = (type: string, value: number) => {
+    const selectedPetData = pets.find(p => p.id === selectedPet);
+    const isDog = selectedPetData?.type === 'dog';
+
+    switch (type) {
+      case 'temperature':
+        if (isDog) {
+          return value > 39.2 ? 'high' : value < 38.3 ? 'low' : 'normal';
+        } else {
+          return value > 39.5 ? 'high' : value < 38.1 ? 'low' : 'normal';
+        }
+      case 'heart_rate':
+        if (isDog) {
+          return value > 140 ? 'high' : value < 60 ? 'low' : 'normal';
+        } else {
+          return value > 200 ? 'high' : value < 120 ? 'low' : 'normal';
+        }
+      case 'oxygen_level':
+        return value < 95 ? 'low' : 'normal';
+      default:
+        return 'normal';
+    }
+  };
+
+  const latestRecord = records[records.length - 1];
+  const temperatureStatus = latestRecord ? getHealthStatus('temperature', latestRecord.temperature) : 'normal';
+  const heartRateStatus = latestRecord ? getHealthStatus('heart_rate', latestRecord.heart_rate) : 'normal';
+  const oxygenStatus = latestRecord ? getHealthStatus('oxygen_level', latestRecord.oxygen_level) : 'normal';
+
   useEffect(() => {
     fetchPets();
     
@@ -65,6 +95,10 @@ export default function HealthMonitor() {
   useEffect(() => {
     fetchStepsValue();
   }, [selectedPet]);
+
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   const fetchPets = async () => {
     try {
@@ -146,6 +180,33 @@ export default function HealthMonitor() {
     }
   };
 
+  const sendHealthAlert = async (type: string, value: number, status: string) => {
+    try {
+      const selectedPetData = pets.find(p => p.id === selectedPet);
+      if (!selectedPetData) return;
+
+      const message = `${selectedPetData.name}的${type}${status}：${value}${type === '體溫' ? '°C' : type === '心率' ? 'BPM' : '%'}`;
+      sendNotification('健康警報', message);
+    } catch (error) {
+      console.error('發送通知失敗:', error);
+    }
+  };
+
+  const checkHealthStatus = (type: string, value: number) => {
+    const status = getHealthStatus(type, value);
+    if (status !== 'normal') {
+      sendHealthAlert(type, value, status);
+    }
+  };
+
+  useEffect(() => {
+    if (latestRecord) {
+      checkHealthStatus('體溫', latestRecord.temperature);
+      checkHealthStatus('心率', latestRecord.heart_rate);
+      checkHealthStatus('血氧', latestRecord.oxygen_level);
+    }
+  }, [latestRecord]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -172,30 +233,6 @@ export default function HealthMonitor() {
     }
   };
 
-  const getHealthStatus = (type: string, value: number) => {
-    const selectedPetData = pets.find(p => p.id === selectedPet);
-    const isDog = selectedPetData?.type === 'dog';
-
-    switch (type) {
-      case 'temperature':
-        if (isDog) {
-          return value > 39.2 ? 'high' : value < 38.3 ? 'low' : 'normal';
-        } else {
-          return value > 39.5 ? 'high' : value < 38.1 ? 'low' : 'normal';
-        }
-      case 'heart_rate':
-        if (isDog) {
-          return value > 140 ? 'high' : value < 60 ? 'low' : 'normal';
-        } else {
-          return value > 200 ? 'high' : value < 120 ? 'low' : 'normal';
-        }
-      case 'oxygen_level':
-        return value < 95 ? 'low' : 'normal';
-      default:
-        return 'normal';
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'high':
@@ -217,11 +254,6 @@ export default function HealthMonitor() {
         return '正常';
     }
   };
-
-  const latestRecord = records[records.length - 1];
-  const temperatureStatus = latestRecord ? getHealthStatus('temperature', latestRecord.temperature) : 'normal';
-  const heartRateStatus = latestRecord ? getHealthStatus('heart_rate', latestRecord.heart_rate) : 'normal';
-  const oxygenStatus = latestRecord ? getHealthStatus('oxygen_level', latestRecord.oxygen_level) : 'normal';
 
   // 圖表配置
   const chartOptions = {
@@ -313,6 +345,7 @@ export default function HealthMonitor() {
             </div>
             <div className="flex items-center gap-4">
               <select
+                aria-label="選擇寵物"
                 value={selectedPet}
                 onChange={(e) => setSelectedPet(e.target.value)}
                 className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -573,10 +606,12 @@ export default function HealthMonitor() {
             <h2 className="text-xl font-semibold mb-4">新增健康紀錄</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">體溫 (°C)</label>
+                <label htmlFor="temperature" className="block text-sm font-medium text-gray-700">體溫 (°C)</label>
                 <input
+                  id="temperature"
                   type="number"
                   step="0.1"
+                  placeholder="請輸入體溫"
                   value={formData.temperature}
                   onChange={(e) => setFormData({ ...formData, temperature: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -584,9 +619,11 @@ export default function HealthMonitor() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">心率 (BPM)</label>
+                <label htmlFor="heart_rate" className="block text-sm font-medium text-gray-700">心率 (BPM)</label>
                 <input
+                  id="heart_rate"
                   type="number"
+                  placeholder="請輸入心率"
                   value={formData.heart_rate}
                   onChange={(e) => setFormData({ ...formData, heart_rate: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -594,10 +631,12 @@ export default function HealthMonitor() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">血氧 (%)</label>
+                <label htmlFor="oxygen_level" className="block text-sm font-medium text-gray-700">血氧 (%)</label>
                 <input
+                  id="oxygen_level"
                   type="number"
                   step="0.1"
+                  placeholder="請輸入血氧"
                   value={formData.oxygen_level}
                   onChange={(e) => setFormData({ ...formData, oxygen_level: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"

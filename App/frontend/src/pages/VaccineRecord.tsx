@@ -177,18 +177,49 @@ export default function VaccineRecordPage() {
     }
   };
 
-  const checkVaccineReminders = (pets: Pet[]) => {
-    pets.forEach(pet => {
-      const birthDate = new Date(pet.birth_date);
-      const ageInWeeks = Math.floor((new Date().getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
-      
-      vaccineData.forEach(vaccine => {
-        const scheduleWeeks = getVaccineScheduleInWeeks(vaccine.schedule);
-        if (ageInWeeks >= scheduleWeeks) {
-          sendEmailReminder(pet.owner_email, vaccine.name);
+  const checkVaccineReminders = async (pets: Pet[]) => {
+    for (const pet of pets) {
+      try {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('email')
+          .eq('id', pet.user_id)
+          .single();
+
+        if (userError) {
+          console.error('獲取使用者電子郵件時出錯:', {
+            error: userError,
+            petId: pet.id,
+            userId: pet.user_id
+          });
+          continue;
         }
-      });
-    });
+
+        if (!userData || !userData.email) {
+          console.error('找不到使用者電子郵件:', {
+            petId: pet.id,
+            userId: pet.user_id
+          });
+          continue;
+        }
+
+        const birthDate = new Date(pet.birth_date);
+        const ageInWeeks = Math.floor((new Date().getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+        
+        vaccineData.forEach(vaccine => {
+          const scheduleWeeks = getVaccineScheduleInWeeks(vaccine.schedule);
+          if (ageInWeeks >= scheduleWeeks) {
+            sendEmailReminder(userData.email, vaccine.name);
+          }
+        });
+      } catch (error) {
+        console.error('處理疫苗提醒時發生錯誤:', {
+          error,
+          petId: pet.id,
+          userId: pet.user_id
+        });
+      }
+    }
   };
 
   const sendEmailReminder = (email: string, vaccineName: string) => {
