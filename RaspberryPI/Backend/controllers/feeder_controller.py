@@ -1,4 +1,5 @@
-from services.feeder_service import feed_once, feed_until_target, check_status
+from services.feeder_service import feed_once, feed_until_target, check_status, open_gate, close_gate
+from flask import jsonify
 import json
 import time
 import threading
@@ -74,6 +75,14 @@ def handle_mqtt_message(client, payload):
                 "message": "System not active. Please send 'start' first."
             }))
             return
+        
+    elif payload == "open_gate":
+        result = open_gate()
+        client.publish("feeder/status", json.dumps(result))
+
+    elif payload == "close_gate":
+        result = close_gate()
+        client.publish("feeder/status", json.dumps(result))
 
         result = check_status()
         client.publish("feeder/status", json.dumps(result))
@@ -83,3 +92,11 @@ def handle_mqtt_message(client, payload):
             "status": "error",
             "message": f"Unknown command: {payload}"
         }))
+        
+def open_waste():
+    result = open_gate()
+    return jsonify(result)
+
+def close_waste():
+    result = close_gate()
+    return jsonify(result)

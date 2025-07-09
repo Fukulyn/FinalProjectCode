@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from utils.jwt_handler import generate_token
+from RaspberryPI.Backend.Archive.jwt_handler import generate_token
 
 def login():
     data = request.get_json()

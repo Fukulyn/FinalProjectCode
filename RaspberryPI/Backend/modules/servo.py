@@ -3,37 +3,45 @@ from datetime import datetime
 import RPi.GPIO as GPIO
 
 # --- 常數設定 ---
-SERVO_PIN       = 5       # 可依實際腳位調整
-SERVO_FREQUENCY = 50      # MG90S 建議 50Hz
-FIXED_DUTY      = 2.5  # 固定 DutyCycle 7.76 
-ESTIMATED_GRAM  = 5.0     # 假設每次餵這樣的克數（可自訂）
+SERVO_FEED_PIN    = 16       # 餵食馬達 GPIO 腳位
+SERVO_WASTE_PIN   = 5       # 廚餘閘門 GPIO 腳位
+SERVO_FREQUENCY   = 50      # MG90S 建議 50Hz
+FIXED_DUTY        = 9     # 餵食用固定 DutyCycle
+FIXED_DUTY_2      = 2
+ESTIMATED_GRAM    = 5.0     # 假設每次餵這樣的克數（可自訂）
 
 # PWM 物件
-pwm = None
+pwm_feed = None
+pwm_waste = None
 
 def init_servo():
     """
-    初始化伺服馬達：設定 GPIO、啟動 PWM。
+    初始化餵食與廚餘閘門伺服馬達：設定 GPIO、啟動 PWM。
     """
-    global pwm
+    global pwm_feed, pwm_waste
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(SERVO_PIN, GPIO.OUT)
+    GPIO.setup(SERVO_FEED_PIN, GPIO.OUT)
+    GPIO.setup(SERVO_WASTE_PIN, GPIO.OUT)
 
-    pwm = GPIO.PWM(SERVO_PIN, SERVO_FREQUENCY)
-    pwm.start(0)
-    print("伺服馬達已初始化")
+    pwm_feed = GPIO.PWM(SERVO_FEED_PIN, SERVO_FREQUENCY)
+    pwm_feed.start(0)
+    print("[伺服馬達] 餵食器已初始化")
+
+    pwm_waste = GPIO.PWM(SERVO_WASTE_PIN, SERVO_FREQUENCY)
+    pwm_waste.start(0)
+    print("[伺服馬達] 廚餘閘門已初始化")
 
 def feed():
     """
     餵食一次，直接送出固定 DutyCycle。
     返回估算餵食克數。
     """
-    print(f"[餵食中] 伺服馬達輸出 DutyCycle: {FIXED_DUTY}")
-    pwm.ChangeDutyCycle(FIXED_DUTY)
+    print(f"[餵食中] DutyCycle: {FIXED_DUTY}")
+    pwm_feed.ChangeDutyCycle(FIXED_DUTY)
     time.sleep(0.5)
-    pwm.ChangeDutyCycle(0)  # 停止防止抖動
-
+    pwm_feed.ChangeDutyCycle(FIXED_DUTY_2)
+    pwm_feed.ChangeDutyCycle(0)
     print(f"[完成] 餵食 {ESTIMATED_GRAM} g @ {datetime.now().isoformat()}")
     return ESTIMATED_GRAM
 
@@ -53,12 +61,26 @@ def feed_until_weight(target_grams, max_loops=20):
             print("✅ 達到目標餵食重量！")
             break
 
-        pwm.ChangeDutyCycle(FIXED_DUTY)
-        time.sleep(5)
-        pwm.ChangeDutyCycle(0)
+        pwm_feed.ChangeDutyCycle(FIXED_DUTY)
+        time.sleep(3)
+        pwm_feed.ChangeDutyCycle(FIXED_DUTY_2)
+        time.sleep(3)
+        pwm_feed.ChangeDutyCycle(0)
         time.sleep(2)
 
         loop += 1
 
     if loop >= max_loops:
         print("⚠️ 已達最大餵食次數上限，強制停止")
+
+def open_waste_gate():
+    print("[閘門] 開啟廚餘閘門")
+    pwm_waste.ChangeDutyCycle(2)  # 開門位置
+    time.sleep(1)
+    pwm_waste.ChangeDutyCycle(0)
+
+def close_waste_gate():
+    print("[閘門] 關閉廚餘閘門")
+    pwm_waste.ChangeDutyCycle(9)  # 關門位置
+    time.sleep(1)
+    pwm_waste.ChangeDutyCycle(0)
