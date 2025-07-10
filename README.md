@@ -6,6 +6,6 @@
 
 [會議記錄連結](https://www.notion.so/36a319d8309c49ac8abe713efc28bf51)
 
-[企劃書連結](https://tku365-my.sharepoint.com/:w:/g/personal/411630725_o365_tku_edu_tw/EdiUUwiXpHFNhQaPoUfxjr4BJ_L6HlB4ic8DbZh5bGYmqA?e=82z5am)
+[企劃書連結](https://tku365-my.sharepoint.com/:w:/g/personal/411630725_o365_tku_edu_tw/EdiUUwiXpHFNhQaPoUfxjr4BrhvhN0T_h2uGqJ2B00Xjgg?e=rrij95)
 
 [行程表連結](https://tku365-my.sharepoint.com/:x:/g/personal/411630188_o365_tku_edu_tw/Ebj3FxtwgmtBk_HLsklgOjsBQYT-qEkuP5zPv5flCJU8Qg?e=r3cbt0)
