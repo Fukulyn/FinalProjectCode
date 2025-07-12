@@ -2,11 +2,12 @@ import paho.mqtt.client as mqtt
 from datetime import datetime
 from supabase import create_client
 import json
+from paho.mqtt.enums import CallbackAPIVersion
 
 # MQTT 配置
 MQTT_BROKER_URL = "broker.emqx.io"
 MQTT_PORT = 1883
-MQTT_TOPIC = "pet/manager/topic/collar"
+MQTT_TOPIC = "pet/manager/topic/collar" # 专门用于宠物项圈数据的主题
 MQTT_USERNAME = "petmanager"  # MQTT 用戶名
 MQTT_PASSWORD = "petmanager"  # MQTT 密碼
 
@@ -61,7 +62,7 @@ def on_message(client, userdata, msg):
         print(f"处理消息时出错: {e}")
 
 def main():
-    client = mqtt.Client(client_id="health_records_client", callback_api_version=mqtt.CallbackAPIVersion.VERSION1)
+    client = mqtt.Client(client_id="health_records_client", callback_api_version=CallbackAPIVersion.VERSION1)
     client.on_connect = on_connect
     client.on_message = on_message
     
