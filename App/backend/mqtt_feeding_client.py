@@ -2,11 +2,12 @@ import paho.mqtt.client as mqtt
 from datetime import datetime
 from supabase import create_client
 import json
+from paho.mqtt.enums import CallbackAPIVersion
 
 # MQTT 配置
 MQTT_BROKER_URL = "broker.emqx.io"
 MQTT_PORT = 1883
-MQTT_TOPIC = "pet/manager/topic/feeding"  # 专门用于喂食记录的主题
+MQTT_TOPIC = "pet/manager/topic/feeding"  # 餵食器數據讀取及記錄
 MQTT_USERNAME = "petmanager"  # MQTT 用戶名
 MQTT_PASSWORD = "petmanager"  # MQTT 密碼
 
@@ -82,7 +83,7 @@ def on_message(client, userdata, msg):
 
 def main():
     # 创建 MQTT 客户端实例，添加 callback_api_version 参数
-    client = mqtt.Client(client_id="feeding_records_client", callback_api_version=mqtt.CallbackAPIVersion.VERSION1)
+    client = mqtt.Client(client_id="feeding_records_client", callback_api_version=CallbackAPIVersion.VERSION1)
     
     # 设置回调函数
     client.on_connect = on_connect
