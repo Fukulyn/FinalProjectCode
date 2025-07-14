@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Home, Utensils, Plus, Loader2, Info, Calculator, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, FeedingRecord } from '../types';
+import mqtt from "mqtt";
 
 export default function FeedingRecordPage() {
   const [pets, setPets] = useState<Pet[]>([]);
@@ -30,6 +31,33 @@ export default function FeedingRecordPage() {
     carbs: number;
     fiber: number;
   } | null>(null);
+
+  // MQTT 控制相關
+  const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
+  const MQTT_TOPIC = "feeder/command";
+  const MQTT_USERNAME = "petmanager";
+  const MQTT_PASSWORD = "petmanager";
+  const mqttClientRef = React.useRef<mqtt.MqttClient | null>(null);
+
+  React.useEffect(() => {
+    const client = mqtt.connect(MQTT_BROKER, {
+      username: MQTT_USERNAME,
+      password: MQTT_PASSWORD,
+    });
+    mqttClientRef.current = client;
+    return () => {
+      client.end();
+    };
+  }, []);
+
+  const sendFeederCommand = (cmd: string) => {
+    if (mqttClientRef.current && mqttClientRef.current.connected) {
+      mqttClientRef.current.publish(MQTT_TOPIC, cmd);
+      alert(`已傳送指令: ${cmd}`);
+    } else {
+      alert("MQTT 尚未連線，請稍後再試。");
+    }
+  };
 
   useEffect(() => {
     fetchPets();
@@ -456,6 +484,28 @@ export default function FeedingRecordPage() {
           </div>
         </div>
 
+        {/* 餵食器控制區塊 */}
+        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 mb-8">
+          <h3 className="text-lg font-bold mb-2">餵食器控制</h3>
+          <div className="flex flex-wrap gap-2 mb-2">
+            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("start")}>啟動餵食器</button>
+            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("stop")}>停止餵食器</button>
+            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("feed")}>執行一次餵食</button>
+            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("status")}>查詢狀態</button>
+            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("open_gate")}>開啟閘門</button>
+            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("close_gate")}>關閉閘門</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input id="feedUntilWeight" type="number" placeholder="目標重量 (g)" className="border rounded px-2 py-1 w-32" />
+            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => {
+              const weight = (document.getElementById("feedUntilWeight") as HTMLInputElement).value;
+              if (weight) sendFeederCommand(`feed_until ${weight}`);
+              else alert("請輸入目標重量");
+            }}>持續餵食直到達到目標重量</button>
+          </div>
+        </div>
+
+        {/* 餵食紀錄 */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">
