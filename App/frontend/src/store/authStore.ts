@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
-import { startReminderCheck, stopReminderCheck } from '../lib/reminderWorker';
 
 interface AuthState {
   user: User | null;
@@ -31,7 +30,6 @@ export const useAuthStore = create<AuthState>((set) => ({
           created_at: data.user.created_at,
         },
       });
-      startReminderCheck();
     }
   },
 
@@ -49,7 +47,6 @@ export const useAuthStore = create<AuthState>((set) => ({
           created_at: data.user.created_at,
         },
       });
-      startReminderCheck();
     }
   },
 
@@ -57,7 +54,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     set({ user: null });
-    stopReminderCheck();
   },
 
   checkAuth: async () => {
@@ -70,9 +66,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       } : null,
       loading: false 
     });
-    if (user) {
-      startReminderCheck();
-    }
   },
 
   resetPassword: async (email: string) => {

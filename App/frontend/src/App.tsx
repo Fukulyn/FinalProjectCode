@@ -5,12 +5,10 @@ import LoadingScreen from './components/LoadingScreen';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import PetProfile from './pages/PetProfile';
-import DeviceManager from './pages/DeviceManager';
 import VideoMonitor from './pages/VideoMonitor';
 import HealthMonitor from './pages/HealthMonitor';
 import FeedingRecord from './pages/FeedingRecord';
 import VaccineRecord from './pages/VaccineRecord';
-import Reminders from './pages/Reminders';
 
 function App() {
   const { checkAuth, loading, user } = useAuthStore();
@@ -50,12 +48,10 @@ function App() {
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
         <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" replace />} />
         <Route path="/pets" element={user ? <PetProfile /> : <Navigate to="/login" replace />} />
-        <Route path="/devices" element={user ? <DeviceManager /> : <Navigate to="/login" replace />} />
         <Route path="/monitor" element={user ? <VideoMonitor /> : <Navigate to="/login" replace />} />
         <Route path="/health" element={user ? <HealthMonitor /> : <Navigate to="/login" replace />} />
         <Route path="/feeding" element={user ? <FeedingRecord /> : <Navigate to="/login" replace />} />
         <Route path="/vaccines" element={user ? <VaccineRecord /> : <Navigate to="/login" replace />} />
-        <Route path="/reminders" element={user ? <Reminders /> : <Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );
