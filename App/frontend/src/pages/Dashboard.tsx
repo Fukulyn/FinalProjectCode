@@ -1,37 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { Link } from 'react-router-dom';
-import { Heart, Utensils, Syringe, Camera, Wifi, Bell, Trash2 } from 'lucide-react';
+import { Heart, Utensils, Syringe, Camera, Bell, Home } from 'lucide-react';
 import Logo from '../components/Logo';
 import { supabase } from '../lib/supabase';
-import { Reminder } from '../types';
+import { VaccineRecord } from '../types';
 
 export default function Dashboard() {
   const { signOut, user } = useAuthStore();
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [vaccineAlerts, setVaccineAlerts] = useState<VaccineRecord[]>([]);
+  const [showAlertPopup, setShowAlertPopup] = useState(false);
 
+  // 檢查疫苗即將到期
   useEffect(() => {
-    fetchReminders();
-  }, []);
-
-  const fetchReminders = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('reminders')
-        .select('*, pets(name)')
-        .eq('user_id', user?.id)
-        .eq('active', true)
-        .order('scheduled_time');
-
-      if (error) throw error;
-      setReminders(data || []);
-    } catch (error) {
-      console.error('Error fetching reminders:', error);
-    } finally {
-      setLoading(false);
+    async function checkVaccineReminders() {
+      // 查詢疫苗紀錄並帶出寵物名稱
+      const { data: records } = await supabase
+        .from('vaccine_records')
+        .select('*, pets(name)');
+      const soon = (records || []).filter(r => {
+        const dueDate = r.next_due_date ? new Date(r.next_due_date) : null;
+        if (!dueDate) return false;
+        const days = (dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+        return days <= 7;
+      });
+      setVaccineAlerts(soon);
     }
-  };
+    checkVaccineReminders();
+  }, []);
 
   const menuItems = [
     {
@@ -69,84 +65,61 @@ export default function Dashboard() {
       link: '/monitor',
       color: 'bg-indigo-500',
     },
-    {
-      title: '設備管理',
-      icon: <Wifi className="w-6 h-6" />,
-      description: '智能設備配對與控制',
-      link: '/devices',
-      color: 'bg-yellow-500',
-    },
-    {
-      title: '提醒管理',
-      icon: <Bell className="w-6 h-6" />,
-      description: '管理所有提醒事項',
-      link: '/reminders',
-      color: 'bg-pink-500',
-    },
   ];
-
-  const getReminderIcon = (type: Reminder['type']) => {
-    switch (type) {
-      case 'feeding':
-        return <Utensils className="w-5 h-5" />;
-      case 'medicine':
-        return <Heart className="w-5 h-5" />;
-      case 'cleaning':
-        return <Trash2 className="w-5 h-5" />;
-      case 'vaccine':
-        return <Syringe className="w-5 h-5" />;
-      default:
-        return <Bell className="w-5 h-5" />;
-    }
-  };
-
-  const getTypeText = (type: Reminder['type']) => {
-    switch (type) {
-      case 'feeding':
-        return '餵食';
-      case 'medicine':
-        return '餵藥';
-      case 'cleaning':
-        return '清理';
-      case 'vaccine':
-        return '疫苗';
-      default:
-        return '提醒';
-    }
-  };
-
-  const getRepeatDaysText = (days: number[]) => {
-    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-    if (days.length === 7) return '每天';
-    if (days.length === 0) return '無重複';
-    return days.map(d => `週${weekdays[d]}`).join('、');
-  };
-
-  const handleComplete = async (reminderId: string) => {
-    try {
-      const { error } = await supabase.from('reminder_logs').insert([
-        {
-          reminder_id: reminderId,
-          status: 'completed',
-        },
-      ]);
-
-      if (error) throw error;
-      fetchReminders();
-    } catch (error) {
-      console.error('Error completing reminder:', error);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
+      <nav className="bg-white shadow mb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Logo size="md" />
+              <Link
+                to="/"
+                className="flex items-center gap-2 text-gray-700 hover:text-blue-500 transition-colors"
+              >
+                <Home className="w-5 h-5" />
+                <span>返回主頁</span>
+              </Link>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center gap-4">
+              {/* 右上方小鈴鐺 */}
+              <button className="relative p-2 rounded-full hover:bg-gray-100" onClick={() => setShowAlertPopup(true)}>
+                <Bell className="w-6 h-6 text-gray-700" />
+                {vaccineAlerts.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                    !
+                  </span>
+                )}
+              </button>
+              {showAlertPopup && (
+                <div className="absolute right-4 top-16 z-50 bg-white border rounded shadow-lg p-4 w-80">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-gray-800">疫苗提醒</span>
+                    <button onClick={() => setShowAlertPopup(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                  </div>
+                  {vaccineAlerts.length === 0 ? (
+                    <div className="text-gray-500">目前沒有即將到期或已過期的疫苗</div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {vaccineAlerts.map(alert => {
+                        const dueDate = alert.next_due_date ? new Date(alert.next_due_date) : null;
+                        const days = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+                        return (
+                          <li key={alert.id} className="flex flex-col text-sm">
+                            <span className="font-medium text-gray-700">
+                              {alert.pets?.name ? `${alert.pets.name}：` : ''}{alert.vaccine_name}
+                            </span>
+                            <span>下次接種日：{alert.next_due_date}</span>
+                            <span className={days !== null && days < 0 ? 'text-red-500' : 'text-yellow-600'}>
+                              {days !== null && days < 0 ? `已過期 ${-days} 天` : `即將到期 (${days} 天)`}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
               <span className="mr-4 text-gray-600">{user?.email}</span>
               <button
                 onClick={signOut}
@@ -160,87 +133,32 @@ export default function Dashboard() {
       </nav>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {loading ? (
-          <div className="flex items-center justify-center min-h-[200px]">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          </div>
-        ) : (
-          <>
-            {/* 提醒區塊 */}
-            {reminders.length > 0 && (
-              <div className="px-4 mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">今日提醒</h2>
-                  <Link
-                    to="/reminders"
-                    className="text-sm text-blue-500 hover:text-blue-600"
-                  >
-                    查看全部
-                  </Link>
-                </div>
-                <div className="bg-white rounded-lg shadow-md p-4">
-                  <div className="divide-y divide-gray-200">
-                    {reminders.map((reminder) => (
-                      <div key={reminder.id} className="py-3 first:pt-0 last:pb-0">
-                        <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded-lg ${
-                            reminder.type === 'feeding' ? 'bg-green-100 text-green-600' :
-                            reminder.type === 'medicine' ? 'bg-red-100 text-red-600' :
-                            reminder.type === 'cleaning' ? 'bg-yellow-100 text-yellow-600' :
-                            'bg-purple-100 text-purple-600'
-                          }`}>
-                            {getReminderIcon(reminder.type)}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-sm font-medium text-gray-900">
-                              {reminder.title}
-                            </h3>
-                            <p className="text-sm text-gray-500">
-                              {getTypeText(reminder.type)} · {reminder.scheduled_time.slice(0, 5)} · {getRepeatDaysText(reminder.repeat_days)}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => handleComplete(reminder.id)}
-                            className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
-                          >
-                            完成
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+        {/* 功能選單 */}
+        <div className="px-4 py-6 sm:px-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {menuItems.map((item) => (
+              <Link
+                key={item.title}
+                to={item.link}
+                className="block group"
+              >
+                <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                  <div className={`${item.color} p-4 text-white`}>
+                    {item.icon}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-500 transition-colors">
+                      {item.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {item.description}
+                    </p>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* 功能選單 */}
-            <div className="px-4 py-6 sm:px-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {menuItems.map((item) => (
-                  <Link
-                    key={item.title}
-                    to={item.link}
-                    className="block group"
-                  >
-                    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                      <div className={`${item.color} p-4 text-white`}>
-                        {item.icon}
-                      </div>
-                      <div className="p-4">
-                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-500 transition-colors">
-                          {item.title}
-                        </h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+              </Link>
+            ))}
+          </div>
+        </div>
       </main>
     </div>
   );

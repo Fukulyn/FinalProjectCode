@@ -41,4 +41,17 @@ export const sendNotification = (title: string, body: string) => {
   } catch (error) {
     console.error('發送通知失敗:', error);
   }
+};
+
+export const uploadFcmToken = async (userId: string, token: string) => {
+  try {
+    await fetch('http://localhost:3001/api/save-fcm-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, fcmToken: token }),
+    });
+    console.log('FCM token uploaded');
+  } catch (error) {
+    console.error('FCM token upload failed:', error);
+  }
 }; 

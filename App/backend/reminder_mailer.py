@@ -1,90 +1,73 @@
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime
-import time
-from supabase import create_client
-import schedule
+import requests
+import json
+import os
+from sqlalchemy import create_engine
+import pandas as pd
+import datetime
 
-# Supabase 配置
-SUPABASE_URL = "https://hkjclbdisriyqsvcpmnp.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhramNsYmRpc3JpeXFzdmNwbW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NTM1NzQsImV4cCI6MjA1NTUyOTU3NH0.kcKKU2u_FioHElJBTcV6uDVJjOL6nWDlZ0hz1r26_AQ"
+# 1. 資料庫連線設定（請填入你的 Supabase/Postgres 連線資訊）
+DB_USER = '你的資料庫帳號'
+DB_PASS = '你的資料庫密碼'
+DB_HOST = '你的資料庫主機'
+DB_PORT = '5432'
+DB_NAME = 'postgres'
+engine = create_engine(f'postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}')
 
-# Gmail 配置
-GMAIL_USER = "0966178691wang@gmail.com"
-GMAIL_PASSWORD = "leal xuie cmxj qylr"  # 需要在 Gmail 设置中生成应用专用密码
+# 2. FCM 設定
+FCM_SERVER_KEY = '你的_FCM_server_key'
+FCM_TOKEN_FILE = 'fcm_tokens.json'
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# 發送 FCM 推播
+def send_push_notification(token, title, body):
+    url = 'https://fcm.googleapis.com/fcm/send'
+    headers = {
+        'Authorization': f'key={FCM_SERVER_KEY}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'to': token,
+        'notification': {
+            'title': title,
+            'body': body
+        }
+    }
+    response = requests.post(url, headers=headers, json=data)
+    print('FCM response:', response.json())
 
-def send_email(to_email, subject, body):
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = GMAIL_USER
-        msg['To'] = to_email
-        msg['Subject'] = subject
-
-        msg.attach(MIMEText(body, 'plain'))
-
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(GMAIL_USER, GMAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"邮件已发送到 {to_email}")
-    except Exception as e:
-        print(f"发送邮件时出错: {e}")
-
-def check_reminders():
-    try:
-        # 获取当前时间
-        now = datetime.now()
-        current_time = now.strftime("%H:%M")
-        current_weekday = now.weekday()  # 0-6 表示周一到周日
-
-        # 从数据库获取活动的提醒
-        response = supabase.table('reminders').select(
-            '*,pets(name,owner_email)'
-        ).eq('active', True).execute()
-
-        if response.data:
-            for reminder in response.data:
-                scheduled_time = reminder['scheduled_time']
-                repeat_days = reminder['repeat_days']
-                
-                # 检查时间和星期是否匹配
-                if (scheduled_time == current_time and 
-                    (current_weekday in repeat_days or not repeat_days)):
-                    
-                    pet_name = reminder['pets']['name']
-                    owner_email = reminder['pets']['owner_email']
-                    
-                    # 准备邮件内容
-                    subject = f"寵物提醒 - {reminder['title']}"
-                    body = f"""
-您的寵物 {pet_name} 需要注意：
-
-類型：{reminder['type']}
-標題：{reminder['title']}
-時間：{reminder['scheduled_time']}
-描述：{reminder['description'] or '無'}
-
-請及時處理！
-"""
-                    # 发送邮件
-                    send_email(owner_email, subject, body)
-
-    except Exception as e:
-        print(f"检查提醒时出错: {e}")
+def load_tokens():
+    if os.path.exists(FCM_TOKEN_FILE):
+        with open(FCM_TOKEN_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
 
 def main():
-    print("提醒邮件服务已启动...")
-    
-    # 每分钟检查一次提醒
-    schedule.every().minute.do(check_reminders)
-    
-    while True:
-        schedule.run_pending()
-        time.sleep(30)
+    today = datetime.date.today()
+    soon = today + datetime.timedelta(days=7)  # 7天內到期
 
-if __name__ == "__main__":
+    # 3. 查詢即將到期的疫苗紀錄
+    sql = """
+    SELECT v.id, v.vaccine_name, v.next_due_date, p.name AS pet_name, u.id AS user_id
+    FROM vaccine_records v
+    JOIN pets p ON v.pet_id = p.id
+    JOIN users u ON p.user_id = u.id
+    WHERE v.next_due_date <= %s AND v.next_due_date >= %s
+    """
+    df = pd.read_sql(sql, engine, params=[soon, today])
+    tokens = load_tokens()
+
+    for _, row in df.iterrows():
+        user_id = str(row['user_id'])
+        token = tokens.get(user_id)
+        if not token:
+            print(f'找不到 user_id={user_id} 的 FCM token，略過')
+            continue
+        title = f"【疫苗提醒】{row['pet_name']} 的疫苗即將到期"
+        body = f"您的寵物 {row['pet_name']} 的疫苗「{row['vaccine_name']}」預計於 {row['next_due_date']} 到期，請記得安排接種！"
+        try:
+            send_push_notification(token, title, body)
+            print(f"已推播給 user_id={user_id} ({row['pet_name']})")
+        except Exception as e:
+            print(f"推播失敗：user_id={user_id}，錯誤：{e}")
+
+if __name__ == '__main__':
     main() 
