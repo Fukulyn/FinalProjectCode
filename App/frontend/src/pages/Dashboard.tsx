@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { Link } from 'react-router-dom';
-import { Heart, Utensils, Syringe, Camera, Bell, Home } from 'lucide-react';
+import { Heart, Utensils, Syringe, Bell, Home } from 'lucide-react';
 import Logo from '../components/Logo';
 import { supabase } from '../lib/supabase';
 import { VaccineRecord } from '../types';
@@ -21,8 +21,17 @@ export default function Dashboard() {
       const soon = (records || []).filter(r => {
         const dueDate = r.next_due_date ? new Date(r.next_due_date) : null;
         if (!dueDate) return false;
-        const days = (dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-        return days <= 7;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // 標準化今天日期到午夜
+
+        dueDate.setHours(0, 0, 0, 0); // 標準化到期日到午夜，以避免時區或時間問題
+
+        const diffTime = dueDate.getTime() - today.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        // 只顯示 0-7 天內到期的疫苗
+        return diffDays >= 0 && diffDays <= 7;
       });
       setVaccineAlerts(soon);
     }
@@ -58,13 +67,6 @@ export default function Dashboard() {
       link: '/vaccines',
       color: 'bg-purple-500',
     },
-    {
-      title: '即時監控',
-      icon: <Camera className="w-6 h-6" />,
-      description: '寵物攝影機即時畫面',
-      link: '/monitor',
-      color: 'bg-indigo-500',
-    },
   ];
 
   return (
@@ -98,20 +100,29 @@ export default function Dashboard() {
                     <button onClick={() => setShowAlertPopup(false)} className="text-gray-400 hover:text-gray-600">✕</button>
                   </div>
                   {vaccineAlerts.length === 0 ? (
-                    <div className="text-gray-500">目前沒有即將到期或已過期的疫苗</div>
+                    <div className="text-gray-500">目前沒有即將到期的疫苗</div>
                   ) : (
                     <ul className="space-y-2">
                       {vaccineAlerts.map(alert => {
                         const dueDate = alert.next_due_date ? new Date(alert.next_due_date) : null;
-                        const days = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+                        
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        if (dueDate) {
+                          dueDate.setHours(0, 0, 0, 0);
+                        }
+                        
+                        const days = dueDate ? Math.round((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
                         return (
                           <li key={alert.id} className="flex flex-col text-sm">
                             <span className="font-medium text-gray-700">
                               {alert.pets?.name ? `${alert.pets.name}：` : ''}{alert.vaccine_name}
                             </span>
                             <span>下次接種日：{alert.next_due_date}</span>
-                            <span className={days !== null && days < 0 ? 'text-red-500' : 'text-yellow-600'}>
-                              {days !== null && days < 0 ? `已過期 ${-days} 天` : `即將到期 (${days} 天)`}
+                            <span className={'text-yellow-600'}>
+                              {days === 0 ? '今天到期' : `還剩 ${days} 天`}
                             </span>
                           </li>
                         );
