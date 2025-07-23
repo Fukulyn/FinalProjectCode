@@ -21,6 +21,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       email,
       password,
     });
+    console.log('登入 API 回傳', data, error);
     if (error) throw error;
     if (data.user) {
       set({
@@ -30,6 +31,9 @@ export const useAuthStore = create<AuthState>((set) => ({
           created_at: data.user.created_at,
         },
       });
+      console.log('user 狀態已設置', data.user);
+    } else {
+      console.log('data.user 為 null', data);
     }
   },
 
