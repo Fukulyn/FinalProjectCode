@@ -1,4 +1,4 @@
-from services.feeder_service import feed_once, feed_until_target, check_status, open_gate, close_gate
+from Service.feeder_service import feed_once, feed_until_target, check_status, open_gate, close_gate
 from flask import jsonify
 import json
 import time

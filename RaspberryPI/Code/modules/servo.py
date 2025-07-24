@@ -75,7 +75,7 @@ def feed_until_weight(target_grams, max_loops=20):
 
 def open_waste_gate():
     print("[閘門] 開啟廚餘閘門")
-    pwm_waste.ChangeDutyCycle(2)  # 開門位置
+    pwm_waste.ChangeDutyCycle(4)  # 開門位置
     time.sleep(1)
     pwm_waste.ChangeDutyCycle(0)
 
