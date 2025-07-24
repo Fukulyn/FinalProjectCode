@@ -39,6 +39,7 @@ export interface VaccineRecord {
   vaccine_name: string;
   date: string;
   next_due_date: string;
+  pets?: { name: string };
 }
 
 export interface Device {
@@ -59,28 +60,6 @@ export interface VideoStream {
   status: 'active' | 'inactive';
   resolution: string;
   created_at: string;
-}
-
-export interface Reminder {
-  id: string;
-  user_id: string;
-  pet_id: string;
-  type: 'feeding' | 'medicine' | 'cleaning' | 'vaccine';
-  title: string;
-  description?: string;
-  scheduled_time: string;
-  repeat_days: number[];
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ReminderLog {
-  id: string;
-  reminder_id: string;
-  executed_at: string;
-  status: 'pending' | 'completed' | 'missed';
-  notes?: string;
 }
 
 // Add Bluetooth types

@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
-import { startReminderCheck, stopReminderCheck } from '../lib/reminderWorker';
 
 interface AuthState {
   user: User | null;
@@ -22,6 +21,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       email,
       password,
     });
+    console.log('登入 API 回傳', data, error);
     if (error) throw error;
     if (data.user) {
       set({
@@ -31,7 +31,9 @@ export const useAuthStore = create<AuthState>((set) => ({
           created_at: data.user.created_at,
         },
       });
-      startReminderCheck();
+      console.log('user 狀態已設置', data.user);
+    } else {
+      console.log('data.user 為 null', data);
     }
   },
 
@@ -49,7 +51,6 @@ export const useAuthStore = create<AuthState>((set) => ({
           created_at: data.user.created_at,
         },
       });
-      startReminderCheck();
     }
   },
 
@@ -57,7 +58,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     set({ user: null });
-    stopReminderCheck();
   },
 
   checkAuth: async () => {
@@ -70,9 +70,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       } : null,
       loading: false 
     });
-    if (user) {
-      startReminderCheck();
-    }
   },
 
   resetPassword: async (email: string) => {
