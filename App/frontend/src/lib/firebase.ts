@@ -1,57 +1,36 @@
-import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken } from 'firebase/messaging';
+// 僅保留 Web Push 訂閱與上傳功能
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXx",
-  authDomain: "pet-health-monitor.firebaseapp.com",
-  projectId: "pet-health-monitor",
-  storageBucket: "pet-health-monitor.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdef1234567890",
-  measurementId: "G-XXXXXXXXXX"
-};
+const VAPID_PUBLIC_KEY = 'BPkjF5Q8CJx9B4i5rC_0INNb1w66HWZSw4TEd-laFk_OrmWvOirz24LuhJYUx1DoXRHhGY6NFSCDGEHfwLdZnGY';
 
-// 初始化 Firebase
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
-
-export const requestNotificationPermission = async () => {
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      const token = await getToken(messaging, {
-        vapidKey: 'BLXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
-      });
-      console.log('Notification token:', token);
-      return token;
+export async function subscribeUserToPush(userId: string) {
+  if (!('serviceWorker' in navigator)) {
+    console.warn('Service Worker 不支援');
+    return;
     }
-    return null;
-  } catch (error) {
-    console.error('Permission request failed:', error);
-    return null;
-  }
-};
-
-export const sendNotification = (title: string, body: string) => {
-  try {
-    new Notification(title, {
-      body,
-      icon: '/logo.png'
-    });
-  } catch (error) {
-    console.error('發送通知失敗:', error);
-  }
-};
-
-export const uploadFcmToken = async (userId: string, token: string) => {
-  try {
-    await fetch('http://localhost:3001/api/save-fcm-token', {
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  });
+  await fetch('http://localhost:3001/api/save-subscription', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, fcmToken: token }),
+    body: JSON.stringify({ userId, subscription }),
     });
-    console.log('FCM token uploaded');
-  } catch (error) {
-    console.error('FCM token upload failed:', error);
+  console.log('Web Push 訂閱已上傳');
+}
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
   }
-}; 
+  return outputArray;
+}
+
+export function getVapidPublicKey() {
+  return VAPID_PUBLIC_KEY;
+} 

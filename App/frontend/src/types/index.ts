@@ -31,6 +31,8 @@ export interface FeedingRecord {
   amount: number;
   calories: number;
   fed_at: string;
+  laser_distance?: number; // 飼料剩餘量
+  weight?: number; // 廚餘重量
 }
 
 export interface VaccineRecord {

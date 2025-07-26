@@ -47,17 +47,22 @@ self.addEventListener('fetch', event => {
     );
 });
 
-// FCM 推播事件處理
+// Web Push/FCM 推播事件處理（自動判斷格式）
 self.addEventListener('push', function (event) {
     let data = {};
     if (event.data) {
-        data = event.data.json();
+        try {
+            data = event.data.json();
+        } catch (e) {
+            data = { title: '新通知', body: event.data.text() };
+        }
     }
-    const title = data.notification?.title || '新通知';
+    // 支援 Web Push 格式（title/body）與 FCM 格式（notification）
+    const title = data.title || data.notification?.title || '新通知';
     const options = {
-        body: data.notification?.body || '',
-        icon: data.notification?.icon || '/Gemini_Generated_Image_192.png',
-        data: data.notification?.click_action ? { url: data.notification.click_action } : {},
+        body: data.body || data.notification?.body || '',
+        icon: data.icon || data.notification?.icon || '/Gemini_Generated_Image_192.png',
+        data: data.url || data.notification?.click_action ? { url: data.url || data.notification?.click_action } : {},
     };
     event.waitUntil(self.registration.showNotification(title, options));
 });
