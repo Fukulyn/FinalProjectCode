@@ -8,6 +8,7 @@ import PetProfile from './pages/PetProfile';
 import HealthMonitor from './pages/HealthMonitor';
 import FeedingRecord from './pages/FeedingRecord';
 import VaccineRecord from './pages/VaccineRecord';
+import { subscribeUserToPush } from './lib/firebase';
 
 function App() {
   const { checkAuth, loading, user } = useAuthStore();
@@ -28,6 +29,12 @@ function App() {
       Notification.requestPermission();
     }
   }, []);
+
+  useEffect(() => {
+    if (user && user.id) {
+      subscribeUserToPush(user.id);
+    }
+  }, [user]);
 
   if (initialLoading) {
     return <LoadingScreen />;

@@ -6,7 +6,6 @@ import { Pet, VaccineRecord } from '../types';
 import styled from 'styled-components';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { requestNotificationPermission, uploadFcmToken } from '../lib/firebase';
 
 interface VaccineInfo {
   name: string;
@@ -90,9 +89,8 @@ export default function VaccineRecordPage() {
     // 假設有 userId 可用（可根據實際登入狀態取得）
     const userId = localStorage.getItem('userId');
     if (userId) {
-      requestNotificationPermission().then(token => {
-        if (token) uploadFcmToken(userId, token);
-      });
+      // 刪除這行：requestNotificationPermission().then(token => {
+      // 刪除這行：if (token) uploadFcmToken(userId, token);
     }
   }, []);
 

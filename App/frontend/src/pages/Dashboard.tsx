@@ -5,6 +5,7 @@ import { Heart, Utensils, Syringe, Bell, Home } from 'lucide-react';
 import Logo from '../components/Logo';
 import { supabase } from '../lib/supabase';
 import { VaccineRecord } from '../types';
+import { subscribeUserToPush } from '../lib/firebase';
 
 export default function Dashboard() {
   const { signOut, user } = useAuthStore();
@@ -92,6 +93,15 @@ export default function Dashboard() {
                     !
                   </span>
                 )}
+              </button>
+              {/* 新增 Web Push 訂閱按鈕 */}
+              <button
+                className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 ml-2"
+                onClick={() => user && subscribeUserToPush(user.id)}
+                title="訂閱推播通知"
+              >
+                <Bell className="w-5 h-5 inline-block mr-1" />
+                訂閱通知
               </button>
               {showAlertPopup && (
                 <div className="absolute right-4 top-16 z-50 bg-white border rounded shadow-lg p-4 w-80">
