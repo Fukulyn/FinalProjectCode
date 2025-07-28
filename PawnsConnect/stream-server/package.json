@@ -1,0 +1,12 @@
+{
+  "name": "pawsconnect-stream-server",
+  "version": "1.0.0",
+  "description": "RTSP to MJPEG stream server for PawsConnect",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "node-rtsp-stream": "^0.0.9"
+  }
+}
