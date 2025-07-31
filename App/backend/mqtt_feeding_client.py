@@ -19,16 +19,17 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 存储喂食记录到 Supabase
-def store_feeding_record(timestamp, pet_id, angle, weight, laser_distance, power,food_type,calories):
+# 這裡的參數名稱與 Supabase 欄位名稱保持一致，但實際傳入的值是來自 MQTT 訊息的解析結果
+def store_feeding_record(timestamp, pet_id, amount, weight, laser_distance, power, food_type, calories):
     try:
-        # 構建要插入的數據
+        # 直接使用傳入的參數來構建要插入的數據，這些參數已在 on_message 中處理過映射關係
         data = {
-            'fed_at': timestamp,  # 假設 timestamp 對應到 fed_at 欄位
+            'fed_at': timestamp,
             'pet_id': pet_id,
-            'amount': angle,  # 將角度存放到 amount 欄位
-            'weight': weight,  # 將重量存放到 weight 欄位
-            'laser_distance': laser_distance,  # 將雷射距離存放到 laser_distance 欄位
-            'power': power,  # 新增電量欄位
+            'amount': amount,           # 本次餵食飼料重量 (來自 MQTT 的 'Weight' 欄位)
+            'weight': weight,           # 廚餘重量 (來自 MQTT 的 'height_waste' 欄位)
+            'laser_distance': laser_distance, # 測量飼料量的雷射距離 (來自 MQTT 的 'height_feed' 欄位)
+            'power': power,
             'food_type': food_type,
             'calories': calories
         }
@@ -50,54 +51,76 @@ def on_connect(client, userdata, flags, rc):
         print(f"連接失敗，返回代碼 {rc}")
 
 def on_message(client, userdata, msg):
-    timestamp = datetime.now().isoformat()
     message = msg.payload.decode()
-    print(f"收到餵食紀錄 - {timestamp}: {msg.topic} - {message}")
+    print(f"收到餵食紀錄: {msg.topic} - {message}")
     
     # 解析消息
     try:
         data = json.loads(message)
-        angle = data.get('angle')
-        weight = data.get('weight')
-        laser_distance = data.get('laser_distance')
+        
+        # 從接收到的數據中提取欄位。
+        # 這裡根據你的新要求進行映射：
+        timestamp = data.get('timestamp')
         pet_id = data.get('pet_id')
-        power = data.get('power')  # 解析電量
+        
+        # 將 MQTT 訊息中的 'Weight' (本次餵食飼料重量) 存入 Supabase 的 'amount' 欄位
+        amount = data.get('Weight') # 注意這裡使用大寫 'Weight'，與您的範例訊息一致
+        
+        weight = data.get('height_waste')      # MQTT 的 'height_waste' 對應 Supabase 的 'weight'
+        laser_distance = data.get('height_feed') # MQTT 的 'height_feed' 對應 Supabase 的 'laser_distance'
+        power = data.get('power')
+        # 'angle' 欄位從此訊息中接收，但不會儲存到 'amount' 中
+        # angle = data.get('angle') # 我們現在不使用 'angle' 存到 'amount' 了
+
         food_type = data.get('food_type', 'default_food')
-        calories = data.get('calories', 0)
+        calories = data.get('calories', 0) # 如果訊息中沒有 'calories' 欄位，它將為 0
         
-
-        if angle is not None:
-            print(f"角度: {angle}°")
+        # 打印解析後的數據
+        if timestamp:
+            print(f"時間戳: {timestamp}")
+        if pet_id:
+            print(f"寵物 ID: {pet_id}")
+        if amount is not None:
+            print(f"本次餵食飼料重量 (amount): {amount}g") # 顯示為 g，因為是重量
         if weight is not None:
-            print(f"廚餘重量: {weight}g")
+            print(f"廚餘高度 (weight): {weight}mm")
         if laser_distance is not None:
-            print(f"雷射感應距離: {laser_distance}mm")
+            print(f"飼料高度 (laser_distance): {laser_distance}mm")
         if power is not None:
-            print(f"電量: {power}V")  # 假設電量以伏特為單位
-
-        # 存储到 Supabase
-        store_feeding_record(timestamp, pet_id, angle, weight, laser_distance, power,food_type,calories)
+            print(f"電量: {power}V")
+        if food_type:
+            print(f"食物類型: {food_type}")
+        if calories is not None:
+            print(f"卡路里: {calories}")
         
+        # 存储到 Supabase，直接傳遞已映射好名稱的變數
+        store_feeding_record(timestamp, pet_id, amount, weight, laser_distance, power, food_type, calories)
+        
+    except json.JSONDecodeError as e:
+        print(f"解析 JSON 消息時出錯: {e}")
     except Exception as e:
-        print(f"解析消息時出錯: {e}")
+        print(f"處理消息時出錯: {e}")
 
 def main():
-    # 创建 MQTT 客户端实例，添加 callback_api_version 参数
+    # 创建 MQTT 客户端实例
     client = mqtt.Client(client_id="feeding_records_client", callback_api_version=CallbackAPIVersion.VERSION1)
     
     # 设置回调函数
     client.on_connect = on_connect
     client.on_message = on_message
     
+    # 如果 MQTT Broker 需要用戶名和密碼，請取消註釋下方兩行
+    # client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    
     try:
         print(f"正在連接到 {MQTT_BROKER_URL}...")
         client.connect(MQTT_BROKER_URL, MQTT_PORT, 60)
         
-        # 开始循环
+        # 開始循環，保持連接
         client.loop_forever()
         
     except Exception as e:
         print(f"連接失敗: {e}")
 
 if __name__ == "__main__":
-    main() 
+    main()

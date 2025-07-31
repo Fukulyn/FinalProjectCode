@@ -13,7 +13,6 @@ export default function PetProfile() {
   const [editingPet, setEditingPet] = useState<Pet | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    type: '',
     breed: '',
     birth_date: '',
     weight: '',
@@ -54,7 +53,6 @@ export default function PetProfile() {
           .from('pets')
           .update({
             name: formData.name,
-            type: formData.type,
             breed: formData.breed,
             birth_date: formData.birth_date,
             weight: parseFloat(formData.weight),
@@ -68,7 +66,6 @@ export default function PetProfile() {
           {
             user_id: user?.id,
             name: formData.name,
-            type: formData.type,
             breed: formData.breed,
             birth_date: formData.birth_date,
             weight: parseFloat(formData.weight),
@@ -80,7 +77,6 @@ export default function PetProfile() {
 
       setFormData({
         name: '',
-        type: '',
         breed: '',
         birth_date: '',
         weight: '',
@@ -88,9 +84,15 @@ export default function PetProfile() {
       setShowForm(false);
       setEditingPet(null);
       fetchPets();
-    } catch (error) {
-      console.error('Error saving pet:', error);
-      setError('儲存寵物資料時發生錯誤');
+    } catch (error: unknown) {
+      // Supabase 的 error 物件通常有 message 屬性
+      if (error && typeof error === 'object' && 'message' in error) {
+        setError((error as { message?: string }).message || JSON.stringify(error));
+        console.error('Error saving pet:', error, (error as { message?: string }).message, JSON.stringify(error));
+      } else {
+        setError(JSON.stringify(error) || '儲存寵物資料時發生錯誤');
+        console.error('Error saving pet:', error, JSON.stringify(error));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -107,7 +109,6 @@ export default function PetProfile() {
     setEditingPet(pet);
     setFormData({
       name: pet.name,
-      type: pet.type,
       breed: pet.breed || '',
       birth_date: pet.birth_date ? new Date(pet.birth_date).toISOString().split('T')[0] : '',
       weight: pet.weight.toString(),
@@ -173,7 +174,6 @@ export default function PetProfile() {
                   setEditingPet(null);
                   setFormData({
                     name: '',
-                    type: '',
                     breed: '',
                     birth_date: '',
                     weight: '',
@@ -220,23 +220,7 @@ export default function PetProfile() {
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
-                <div>
-                  <label htmlFor="petType" className="block text-sm font-medium text-gray-700">寵物類型</label>
-                  <select
-                    id="petType"
-                    name="type"
-                    value={formData.type}
-                    onChange={handleChange}
-                    required
-                    aria-label="選擇寵物類型"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  >
-                    <option value="">請選擇</option>
-                    <option value="dog">狗</option>
-                    <option value="cat">貓</option>
-                    <option value="other">其他</option>
-                  </select>
-                </div>
+
                 <div>
                   <label htmlFor="breed" className="block text-sm font-medium text-gray-700">品種</label>
                   <input
@@ -325,18 +309,12 @@ export default function PetProfile() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${
-                      pet.type === 'dog' ? 'bg-blue-100 text-blue-500' :
-                      pet.type === 'cat' ? 'bg-purple-100 text-purple-500' :
-                      'bg-green-100 text-green-500'
-                    }`}>
+                    <div className="p-2 rounded-full bg-green-100 text-green-500">
                       <PawPrint className="w-6 h-6" />
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">{pet.name}</h3>
-                      <p className="text-sm text-gray-500">
-                        {pet.type === 'dog' ? '狗' : pet.type === 'cat' ? '貓' : '其他'} · {pet.breed}
-                      </p>
+                      <p className="text-sm text-gray-500">{pet.breed}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
