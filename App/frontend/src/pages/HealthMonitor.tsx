@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, Plus, Loader2, Heart, Activity, LineChart, BatteryCharging } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, HealthRecord } from '../types';
-import { requestNotificationPermission, sendNotification } from '../lib/firebase';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -96,10 +95,6 @@ export default function HealthMonitor() {
     fetchStepsValue();
   }, [selectedPet]);
 
-  useEffect(() => {
-    requestNotificationPermission();
-  }, []);
-
   const fetchPets = async () => {
     try {
       const { data, error } = await supabase
@@ -179,33 +174,6 @@ export default function HealthMonitor() {
       console.error('Error fetching steps value:', error);
     }
   };
-
-  const sendHealthAlert = async (type: string, value: number, status: string) => {
-    try {
-      const selectedPetData = pets.find(p => p.id === selectedPet);
-      if (!selectedPetData) return;
-
-      const message = `${selectedPetData.name}的${type}${status}：${value}${type === '體溫' ? '°C' : type === '心率' ? 'BPM' : '%'}`;
-      sendNotification('健康警報', message);
-    } catch (error) {
-      console.error('發送通知失敗:', error);
-    }
-  };
-
-  const checkHealthStatus = (type: string, value: number) => {
-    const status = getHealthStatus(type, value);
-    if (status !== 'normal') {
-      sendHealthAlert(type, value, status);
-    }
-  };
-
-  useEffect(() => {
-    if (latestRecord) {
-      checkHealthStatus('體溫', latestRecord.temperature);
-      checkHealthStatus('心率', latestRecord.heart_rate);
-      checkHealthStatus('血氧', latestRecord.oxygen_level);
-    }
-  }, [latestRecord]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

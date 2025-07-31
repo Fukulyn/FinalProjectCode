@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Utensils, Plus, Loader2, Info, Calculator, Calendar } from 'lucide-react';
+import { Home, Utensils, Plus, Loader2, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, FeedingRecord } from '../types';
 import mqtt from "mqtt";
@@ -24,12 +24,26 @@ export default function FeedingRecordPage() {
     activityLevel: 'normal', // low, normal, high
     age: 'adult', // puppy, adult, senior
   });
-  const [calculatedNutrition, setCalculatedNutrition] = useState<{
-    calories: number;
+  interface FoodData {
+    food_type: string;
+    protein?: number;
+    fat?: number;
+    fiber?: number;
+    calcium?: number;
+    phosphorus?: number;
+    moisture?: number;
+    calories?: number;
+  }
+  const [foodList, setFoodList] = useState<FoodData[]>([]);
+  const [selectedFood, setSelectedFood] = useState<FoodData | null>(null);
+  const [nutritionResult, setNutritionResult] = useState<{
     protein: number;
     fat: number;
-    carbs: number;
     fiber: number;
+    calcium: number;
+    phosphorus: number;
+    moisture: number;
+    calories?: number; // Added calories to the state
   } | null>(null);
 
   // MQTT 控制相關
@@ -61,6 +75,7 @@ export default function FeedingRecordPage() {
 
   useEffect(() => {
     fetchPets();
+    fetchFoodList();
   }, []);
 
   useEffect(() => {
@@ -142,13 +157,23 @@ export default function FeedingRecordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // 自動計算 calories
+    const food = foodList.find(f => f.food_type === formData.food_type);
+    let calories = 0;
+    if (food && formData.amount) {
+      const ratio = parseFloat(formData.amount) / 100;
+      const protein = (food.protein || 0) * ratio;
+      const fat = (food.fat || 0) * ratio;
+      const carbs = Math.max(0, (100 - ((food.protein || 0) + (food.fat || 0) + (food.fiber || 0) + (food.moisture || 0))) * ratio);
+      calories = protein * 4 + fat * 9 + carbs * 4;
+    }
     try {
       const { error } = await supabase.from('feeding_records').insert([
         {
           pet_id: selectedPet,
           food_type: formData.food_type,
           amount: parseFloat(formData.amount),
-          calories: parseInt(formData.calories),
+          calories: Math.round(calories),
         },
       ]);
 
@@ -163,63 +188,11 @@ export default function FeedingRecordPage() {
       fetchFeedingRecords();
     } catch (error) {
       console.error('Error adding feeding record:', error);
+      alert(JSON.stringify(error));
     }
   };
 
-  const calculateNutrition = () => {
-    const weight = parseFloat(nutritionCalculator.weight);
-    if (!weight || isNaN(weight)) return;
-
-    let baseCalories = 0;
-    let proteinPercentage = 0;
-    let fatPercentage = 0;
-    let carbsPercentage = 0;
-    let fiberGrams = 0;
-
-    // 基礎熱量計算
-    if (nutritionCalculator.petType === 'dog') {
-      baseCalories = weight * (nutritionCalculator.age === 'puppy' ? 40 : 
-                              nutritionCalculator.age === 'senior' ? 30 : 35);
-      proteinPercentage = nutritionCalculator.age === 'puppy' ? 0.25 : 0.18;
-      fatPercentage = 0.12;
-      carbsPercentage = 0.40;
-      fiberGrams = weight * 0.1; // 約每公斤體重0.1克纖維
-    } else {
-      baseCalories = weight * (nutritionCalculator.age === 'kitten' ? 50 : 
-                              nutritionCalculator.age === 'senior' ? 40 : 45);
-      proteinPercentage = 0.28;
-      fatPercentage = 0.18;
-      carbsPercentage = 0.08;
-      fiberGrams = weight * 0.05; // 約每公斤體重0.05克纖維
-    }
-
-    // 根據活動量調整
-    const activityMultiplier = nutritionCalculator.activityLevel === 'low' ? 0.8 : 
-                              nutritionCalculator.activityLevel === 'high' ? 1.2 : 1.0;
-    const calories = Math.round(baseCalories * activityMultiplier);
-
-    // 計算各營養素
-    const protein = Math.round(calories * proteinPercentage / 4); // 蛋白質每克4卡路里
-    const fat = Math.round(calories * fatPercentage / 9); // 脂肪每克9卡路里
-    const carbs = Math.round(calories * carbsPercentage / 4); // 碳水每克4卡路里
-
-    setCalculatedNutrition({
-      calories,
-      protein,
-      fat,
-      carbs,
-      fiber: Math.round(fiberGrams * 10) / 10
-    });
-  };
-
-  const getTotalCalories = () => {
-    return records.reduce((sum, record) => sum + record.calories, 0);
-  };
-
-  const getRecommendedCalories = () => {
-    if (!calculatedNutrition) return null;
-    return calculatedNutrition.calories;
-  };
+  // (已移除未用的 calculateNutrition, getRecommendedCalories)
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -241,6 +214,38 @@ export default function FeedingRecordPage() {
     currentDate.setDate(currentDate.getDate() + 1);
     setSelectedDate(currentDate.toISOString().split('T')[0]);
   };
+
+  const fetchFoodList = async () => {
+    const { data, error } = await supabase.from('food_data').select('*');
+    console.log('foodList', data, error); // 除錯用
+    if (!error && data) setFoodList(data);
+  };
+
+  // 新增：根據選擇的飼料品牌與餵食量計算營養成分
+  useEffect(() => {
+    if (selectedFood && formData.amount) {
+      const ratio = parseFloat(formData.amount) / 100;
+      const protein = (selectedFood.protein || 0) * ratio;
+      const fat = (selectedFood.fat || 0) * ratio;
+      const fiber = (selectedFood.fiber || 0) * ratio;
+      const calcium = (selectedFood.calcium || 0) * ratio;
+      const phosphorus = (selectedFood.phosphorus || 0) * ratio;
+      const moisture = (selectedFood.moisture || 0) * ratio;
+      const carbs = Math.max(0, (100 - ((selectedFood.protein || 0) + (selectedFood.fat || 0) + (selectedFood.fiber || 0) + (selectedFood.moisture || 0))) * ratio);
+      const calories = protein * 4 + fat * 9 + carbs * 4;
+      setNutritionResult({
+        protein,
+        fat,
+        fiber,
+        calcium,
+        phosphorus,
+        moisture,
+        calories,
+      });
+    } else {
+      setNutritionResult(null);
+    }
+  }, [selectedFood, formData.amount]);
 
   if (loading) {
     return (
@@ -336,152 +341,70 @@ export default function FeedingRecordPage() {
           </div>
         </div>
 
-        {/* 營養計算器 */}
-        <div className="bg-white rounded-lg shadow mb-8">
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">營養需求計算器</h2>
-            <button 
-              onClick={() => setShowNutritionInfo(!showNutritionInfo)}
-              className="text-blue-500 hover:text-blue-600"
-              aria-label="顯示/隱藏營養資訊"
-              title="顯示/隱藏營養資訊"
-            >
-              <Info className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div>
-                <label htmlFor="petType" className="block text-sm font-medium text-gray-700 mb-1">寵物類型</label>
-                <select
-                  id="petType"
-                  value={nutritionCalculator.petType}
-                  onChange={(e) => setNutritionCalculator({...nutritionCalculator, petType: e.target.value})}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  aria-label="選擇寵物類型"
-                  title="選擇寵物類型"
-                >
-                  <option value="dog">狗</option>
-                  <option value="cat">貓</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="weight" className="block text-sm font-medium text-gray-700 mb-1">體重 (kg)</label>
-                <input
-                  id="weight"
-                  type="number"
-                  step="0.1"
-                  value={nutritionCalculator.weight}
-                  onChange={(e) => setNutritionCalculator({...nutritionCalculator, weight: e.target.value})}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  aria-label="輸入寵物體重"
-                  title="輸入寵物體重"
-                  placeholder="請輸入體重"
-                />
-              </div>
-              <div>
-                <label htmlFor="activityLevel" className="block text-sm font-medium text-gray-700 mb-1">活動量</label>
-                <select
-                  id="activityLevel"
-                  value={nutritionCalculator.activityLevel}
-                  onChange={(e) => setNutritionCalculator({...nutritionCalculator, activityLevel: e.target.value})}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  aria-label="選擇寵物活動量"
-                  title="選擇寵物活動量"
-                >
-                  <option value="low">低</option>
-                  <option value="normal">中</option>
-                  <option value="high">高</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="age" className="block text-sm font-medium text-gray-700 mb-1">年齡階段</label>
-                <select
-                  id="age"
-                  value={nutritionCalculator.age}
-                  onChange={(e) => setNutritionCalculator({...nutritionCalculator, age: e.target.value})}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  aria-label="選擇寵物年齡階段"
-                  title="選擇寵物年齡階段"
-                >
-                  {nutritionCalculator.petType === 'dog' ? (
-                    <>
-                      <option value="puppy">幼犬</option>
-                      <option value="adult">成犬</option>
-                      <option value="senior">老犬</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="kitten">幼貓</option>
-                      <option value="adult">成貓</option>
-                      <option value="senior">老貓</option>
-                    </>
-                  )}
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-center">
-              <button
-                onClick={calculateNutrition}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        {/* 新營養計算區塊 */}
+        <div className="bg-white rounded-lg shadow mb-8 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">飼料營養計算</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">飼料品牌</label>
+              <select
+                title="選擇飼料品牌"
+                value={formData.food_type}
+                onChange={e => {
+                  setFormData({ ...formData, food_type: e.target.value });
+                  setSelectedFood(foodList.find(f => f.food_type === e.target.value) || null);
+                }}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               >
-                <Calculator className="w-5 h-5" />
-                計算營養需求
-              </button>
+                <option value="">請選擇飼料品牌</option>
+                {foodList.map(food => (
+                  <option key={food.food_type} value={food.food_type}>{food.food_type}</option>
+                ))}
+              </select>
             </div>
-
-            {calculatedNutrition && (
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                <h3 className="text-md font-semibold text-gray-900 mb-3">
-                  {formatDate(selectedDate)} 營養攝取狀況
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div className="bg-white p-3 rounded-lg shadow-sm">
-                    <p className="text-sm text-gray-500">熱量</p>
-                    <p className="text-lg font-semibold">{calculatedNutrition.calories} kcal</p>
-                  </div>
-                  <div className="bg-white p-3 rounded-lg shadow-sm">
-                    <p className="text-sm text-gray-500">蛋白質</p>
-                    <p className="text-lg font-semibold">{calculatedNutrition.protein} g</p>
-                  </div>
-                  <div className="bg-white p-3 rounded-lg shadow-sm">
-                    <p className="text-sm text-gray-500">脂肪</p>
-                    <p className="text-lg font-semibold">{calculatedNutrition.fat} g</p>
-                  </div>
-                  <div className="bg-white p-3 rounded-lg shadow-sm">
-                    <p className="text-sm text-gray-500">碳水化合物</p>
-                    <p className="text-lg font-semibold">{calculatedNutrition.carbs} g</p>
-                  </div>
-                  <div className="bg-white p-3 rounded-lg shadow-sm">
-                    <p className="text-sm text-gray-500">纖維</p>
-                    <p className="text-lg font-semibold">{calculatedNutrition.fiber} g</p>
-                  </div>
-                </div>
-                
-                <div className="mt-4 flex items-center">
-                  <div className="flex-1 h-4 bg-gray-200 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full ${
-                        getTotalCalories() > getRecommendedCalories()! * 1.1 ? 'bg-red-500' :
-                        getTotalCalories() < getRecommendedCalories()! * 0.9 ? 'bg-yellow-500' :
-                        'bg-green-500'
-                      }`}
-                      style={{ width: `${Math.min(100, (getTotalCalories() / getRecommendedCalories()!) * 100)}%` }}
-                    ></div>
-                  </div>
-                  <div className="ml-4 text-sm">
-                    <span className="font-medium">{getTotalCalories()}</span>
-                    <span className="text-gray-500"> / {getRecommendedCalories()} kcal</span>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-500 mt-2">
-                  {getTotalCalories() > getRecommendedCalories()! * 1.1 ? '熱量攝取過多' :
-                   getTotalCalories() < getRecommendedCalories()! * 0.9 ? '熱量攝取不足' :
-                   '熱量攝取適中'}
-                </p>
-              </div>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">餵食量 (g)</label>
+              <input
+                type="number"
+                value={formData.amount}
+                onChange={e => setFormData({ ...formData, amount: e.target.value })}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                placeholder="請輸入餵食量"
+              />
+            </div>
           </div>
+          {nutritionResult && (
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-6 gap-4">
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">蛋白質</p>
+                <p className="text-lg font-semibold">{nutritionResult.protein.toFixed(2)} g</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">脂肪</p>
+                <p className="text-lg font-semibold">{nutritionResult.fat.toFixed(2)} g</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">纖維</p>
+                <p className="text-lg font-semibold">{nutritionResult.fiber.toFixed(2)} g</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">鈣</p>
+                <p className="text-lg font-semibold">{nutritionResult.calcium.toFixed(2)} g</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">磷</p>
+                <p className="text-lg font-semibold">{nutritionResult.phosphorus.toFixed(2)} g</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">水分</p>
+                <p className="text-lg font-semibold">{nutritionResult.moisture.toFixed(2)} g</p>
+              </div>
+              <div className="bg-yellow-50 p-3 rounded-lg col-span-2 md:col-span-3">
+                <p className="text-sm text-gray-500">大約熱量</p>
+                <p className="text-lg font-semibold">{nutritionResult.calories ? nutritionResult.calories.toFixed(1) : '--'} kcal</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 餵食器控制區塊 */}
@@ -514,50 +437,114 @@ export default function FeedingRecordPage() {
           </div>
           <div className="overflow-x-auto">
             {records.length > 0 ? (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      時間
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      食物類型
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      份量 (g)
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      熱量 (kcal)
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {records.map((record) => (
-                    <tr key={record.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(record.fed_at).toLocaleTimeString('zh-TW')}
+              <>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">時間</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">飼料種類</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">餵食量</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">熱量</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">飼料剩餘量</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">廚餘重量</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {records.map((record) => (
+                      <tr key={record.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(record.fed_at).toLocaleTimeString('zh-TW')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {record.food_type === "default_food" ? (
+                            <select
+                              title="選擇飼料品牌"
+                              value={record.food_type}
+                              onChange={async (e) => {
+                                const newType = e.target.value;
+                                await supabase
+                                  .from('feeding_records')
+                                  .update({ food_type: newType })
+                                  .eq('id', record.id);
+                                fetchFeedingRecords(); // 重新載入
+                              }}
+                              className="border rounded px-2 py-1"
+                            >
+                              <option value="">請選擇飼料品牌</option>
+                              {foodList.map(food => (
+                                <option key={food.food_type} value={food.food_type}>{food.food_type}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            record.food_type
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {record.amount}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {/* getTotalCalories() */}
+                          {(() => {
+                            const food = foodList.find(f => f.food_type === record.food_type);
+                            if (!food) return '--';
+                            const ratio = Number(record.amount) / 100;
+                            const protein = (food.protein || 0) * ratio;
+                            const fat = (food.fat || 0) * ratio;
+                            const carbs = Math.max(0, (100 - ((food.protein || 0) + (food.fat || 0) + (food.fiber || 0) + (food.moisture || 0))) * ratio);
+                            const calories = protein * 4 + fat * 9 + carbs * 4;
+                            return calories.toFixed(1);
+                          })()} kcal
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {record.laser_distance !== undefined ? `${record.laser_distance} mm` : '--'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {record.weight !== undefined ? `${record.weight} g` : '--'}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-50">
+                      <td colSpan={3} className="px-6 py-4 text-right font-medium">
+                        總計
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {record.food_type}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {record.amount}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {record.calories}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        {/* getTotalCalories() */}
                       </td>
                     </tr>
-                  ))}
-                  <tr className="bg-gray-50">
-                    <td colSpan={3} className="px-6 py-4 text-right font-medium">
-                      總計
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                      {getTotalCalories()} kcal
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+                {/* 新增：每次餵食的營養成分顯示 */}
+                <div className="mt-4">
+                  <h3 className="text-md font-semibold mb-2">每次餵食營養成分</h3>
+                  <div className="space-y-2">
+                    {records.map((record) => {
+                      const food = foodList.find(f => f.food_type === record.food_type);
+                      if (!food) return null;
+                      const ratio = Number(record.amount) / 100;
+                      const protein = (food.protein || 0) * ratio;
+                      const fat = (food.fat || 0) * ratio;
+                      const fiber = (food.fiber || 0) * ratio;
+                      const calcium = (food.calcium || 0) * ratio;
+                      const phosphorus = (food.phosphorus || 0) * ratio;
+                      const moisture = (food.moisture || 0) * ratio;
+                      const carbs = Math.max(0, (100 - ((food.protein || 0) + (food.fat || 0) + (food.fiber || 0) + (food.moisture || 0))) * ratio);
+                      const calories = protein * 4 + fat * 9 + carbs * 4;
+                      return (
+                        <div key={record.id} className="bg-gray-50 rounded p-3 flex flex-wrap gap-4 items-center">
+                          <span className="font-medium text-gray-700">{new Date(record.fed_at).toLocaleTimeString('zh-TW')} {record.food_type} {record.amount}g</span>
+                          <span>蛋白質: {protein.toFixed(2)}g</span>
+                          <span>脂肪: {fat.toFixed(2)}g</span>
+                          <span>纖維: {fiber.toFixed(2)}g</span>
+                          <span>鈣: {calcium.toFixed(2)}g</span>
+                          <span>磷: {phosphorus.toFixed(2)}g</span>
+                          <span>水分: {moisture.toFixed(2)}g</span>
+                          <span>熱量: {calories.toFixed(1)} kcal</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
             ) : (
               <div className="py-8 text-center text-gray-500">
                 <Utensils className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -575,15 +562,21 @@ export default function FeedingRecordPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="food_type" className="block text-sm font-medium text-gray-700">食物類型</label>
-                <input
+                <select
                   id="food_type"
-                  type="text"
                   value={formData.food_type}
-                  onChange={(e) => setFormData({ ...formData, food_type: e.target.value })}
+                  onChange={e => {
+                    setFormData({ ...formData, food_type: e.target.value });
+                    setSelectedFood(foodList.find(f => f.food_type === e.target.value) || null);
+                  }}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="請輸入食物類型"
                   required
-                />
+                >
+                  <option value="">請選擇飼料品牌</option>
+                  {foodList.map(food => (
+                    <option key={food.food_type} value={food.food_type}>{food.food_type}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label htmlFor="amount" className="block text-sm font-medium text-gray-700">份量 (g)</label>
@@ -592,21 +585,9 @@ export default function FeedingRecordPage() {
                   type="number"
                   step="0.1"
                   value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  onChange={e => setFormData({ ...formData, amount: e.target.value })}
                   placeholder="請輸入份量"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="calories" className="block text-sm font-medium text-gray-700">熱量 (kcal)</label>
-                <input
-                  id="calories"
-                  type="number"
-                  value={formData.calories}
-                  onChange={(e) => setFormData({ ...formData, calories: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="請輸入熱量"
                   required
                 />
               </div>

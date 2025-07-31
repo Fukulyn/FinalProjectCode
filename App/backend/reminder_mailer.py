@@ -1,27 +1,41 @@
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime
-import time
-from supabase import create_client
-import schedule
+import requests
+import json
+import os
+from sqlalchemy import create_engine
+import pandas as pd
+import datetime
 
-# Supabase 配置
-SUPABASE_URL = "https://hkjclbdisriyqsvcpmnp.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhramNsYmRpc3JpeXFzdmNwbW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NTM1NzQsImV4cCI6MjA1NTUyOTU3NH0.kcKKU2u_FioHElJBTcV6uDVJjOL6nWDlZ0hz1r26_AQ"
+# 1. 資料庫連線設定（Supabase/Postgres 連線資訊）
+engine = create_engine(
+    "postgresql://postgres:LaRLgZWac1t3NHFh@db.hkjclbdisriyqsvcpmnp.supabase.co:5432/postgres?sslmode=require"
+)
 
-# Gmail 配置
-GMAIL_USER = "0966178691wang@gmail.com"
-GMAIL_PASSWORD = "leal xuie cmxj qylr"  # 需要在 Gmail 设置中生成应用专用密码
+# 2. FCM 設定
+FCM_SERVER_KEY = '你的_FCM_server_key'
+FCM_TOKEN_FILE = 'fcm_tokens.json'
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# 發送 FCM 推播
+def send_push_notification(token, title, body):
+    url = 'https://fcm.googleapis.com/fcm/send'
+    headers = {
+        'Authorization': f'key={FCM_SERVER_KEY}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'to': token,
+        'notification': {
+            'title': title,
+            'body': body
+        }
+    }
+    response = requests.post(url, headers=headers, json=data)
+    print('FCM response:', response.json())
 
-def send_email(to_email, subject, body):
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = GMAIL_USER
-        msg['To'] = to_email
-        msg['Subject'] = subject
+def load_tokens():
+    if os.path.exists(FCM_TOKEN_FILE):
+        with open(FCM_TOKEN_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
 
 # 發送 Web Push
 def send_webpush(user_id, title, body):
@@ -36,14 +50,8 @@ def send_webpush(user_id, title, body):
     print('WebPush response:', response.json())
 
 def main():
-    print("提醒邮件服务已启动...")
-    
-    # 每分钟检查一次提醒
-    schedule.every().minute.do(check_reminders)
-    
-    while True:
-        schedule.run_pending()
-        time.sleep(30)
+    today = datetime.date.today()
+    soon = today + datetime.timedelta(days=7)  # 7天內到期
 
     # 3. 查詢即將到期的疫苗紀錄
     sql = """

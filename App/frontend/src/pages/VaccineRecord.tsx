@@ -4,6 +4,8 @@ import { Home, Syringe, Plus, Loader2, CheckCircle, XCircle } from 'lucide-react
 import { supabase } from '../lib/supabase';
 import { Pet, VaccineRecord } from '../types';
 import styled from 'styled-components';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 interface VaccineInfo {
   name: string;
@@ -84,6 +86,12 @@ export default function VaccineRecordPage() {
 
   useEffect(() => {
     fetchPets();
+    // 假設有 userId 可用（可根據實際登入狀態取得）
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      // 刪除這行：requestNotificationPermission().then(token => {
+      // 刪除這行：if (token) uploadFcmToken(userId, token);
+    }
   }, []);
 
   useEffect(() => {
@@ -177,6 +185,17 @@ export default function VaccineRecordPage() {
     }
   };
 
+  const deleteVaccineRecord = async (recordId: string) => {
+    try {
+      const { error } = await supabase.from('vaccine_records').delete().eq('id', recordId);
+      if (error) throw error;
+      fetchVaccineRecords();
+    } catch (error) {
+      alert('刪除疫苗紀錄失敗');
+      console.error('刪除疫苗紀錄失敗:', error);
+    }
+  };
+
   const checkVaccineReminders = async (pets: Pet[]) => {
     for (const pet of pets) {
       try {
@@ -222,8 +241,19 @@ export default function VaccineRecordPage() {
     }
   };
 
-  const sendEmailReminder = (email: string, vaccineName: string) => {
-    console.log(`發送提醒郵件給 ${email}，疫苗名稱：${vaccineName}`);
+  const sendEmailReminder = async (email: string, vaccineName: string) => {
+    try {
+      const res = await fetch('http://localhost:3001/api/send-vaccine-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, vaccine_name: vaccineName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '寄信失敗');
+      console.log('Email sent:', data);
+    } catch (err) {
+      console.error('Email send error:', err);
+    }
   };
 
   const getVaccineScheduleInWeeks = (schedule: string): number => {
@@ -241,6 +271,7 @@ export default function VaccineRecordPage() {
 
   return (
     <Container>
+      <ToastContainer position="top-center" autoClose={3000} aria-label="疫苗操作提示" />
       <nav className="bg-white shadow mb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -386,9 +417,9 @@ export default function VaccineRecordPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => updateVaccineStatus(record.id, '未接種')}
+                        onClick={() => deleteVaccineRecord(record.id)}
                         className="text-red-500 hover:text-red-700 ml-2"
-                        aria-label="標記為未接種"
+                        aria-label="刪除疫苗紀錄"
                       >
                         <XCircle className="w-4 h-4" />
                       </button>
