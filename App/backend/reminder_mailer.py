@@ -39,7 +39,7 @@ def load_tokens():
 
 # 發送 Web Push
 def send_webpush(user_id, title, body):
-    url = 'http://localhost:3001/api/send-webpush'
+    url = 'https://7jjl14w0-3001.asse.devtunnels.ms/api/send-webpush'  # 用你的公開網址
     headers = {'Content-Type': 'application/json'}
     data = {
         'userId': user_id,
@@ -74,4 +74,4 @@ def main():
             print(f"推播失敗：user_id={user_id}，錯誤：{e}")
 
 if __name__ == '__main__':
-    main() 
+    main()
