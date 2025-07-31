@@ -26,9 +26,9 @@ def store_feeding_record(timestamp, pet_id, amount, weight, laser_distance, powe
         data = {
             'fed_at': timestamp,
             'pet_id': pet_id,
-            'amount': amount,
-            'weight': weight,           # 廚餘重量 (來自 MQTT 的 height_waste)
-            'laser_distance': laser_distance, # 測量飼料量的雷射距離 (來自 MQTT 的 height_feed)
+            'amount': amount,           # 本次餵食飼料重量 (來自 MQTT 的 'Weight' 欄位)
+            'weight': weight,           # 廚餘重量 (來自 MQTT 的 'height_waste' 欄位)
+            'laser_distance': laser_distance, # 測量飼料量的雷射距離 (來自 MQTT 的 'height_feed' 欄位)
             'power': power,
             'food_type': food_type,
             'calories': calories
@@ -59,15 +59,21 @@ def on_message(client, userdata, msg):
         data = json.loads(message)
         
         # 從接收到的數據中提取欄位。
-        # 這裡直接將 MQTT 訊息中的名稱映射到 Supabase 對應的欄位名稱
+        # 這裡根據你的新要求進行映射：
         timestamp = data.get('timestamp')
         pet_id = data.get('pet_id')
-        amount = data.get('angle')             # MQTT 的 'angle' 對應 Supabase 的 'amount'
+        
+        # 將 MQTT 訊息中的 'Weight' (本次餵食飼料重量) 存入 Supabase 的 'amount' 欄位
+        amount = data.get('Weight') # 注意這裡使用大寫 'Weight'，與您的範例訊息一致
+        
         weight = data.get('height_waste')      # MQTT 的 'height_waste' 對應 Supabase 的 'weight'
         laser_distance = data.get('height_feed') # MQTT 的 'height_feed' 對應 Supabase 的 'laser_distance'
         power = data.get('power')
+        # 'angle' 欄位從此訊息中接收，但不會儲存到 'amount' 中
+        # angle = data.get('angle') # 我們現在不使用 'angle' 存到 'amount' 了
+
         food_type = data.get('food_type', 'default_food')
-        calories = data.get('calories', 0)
+        calories = data.get('calories', 0) # 如果訊息中沒有 'calories' 欄位，它將為 0
         
         # 打印解析後的數據
         if timestamp:
@@ -75,7 +81,7 @@ def on_message(client, userdata, msg):
         if pet_id:
             print(f"寵物 ID: {pet_id}")
         if amount is not None:
-            print(f"餵食角度 (amount): {amount}°")
+            print(f"本次餵食飼料重量 (amount): {amount}g") # 顯示為 g，因為是重量
         if weight is not None:
             print(f"廚餘高度 (weight): {weight}mm")
         if laser_distance is not None:
@@ -86,7 +92,7 @@ def on_message(client, userdata, msg):
             print(f"食物類型: {food_type}")
         if calories is not None:
             print(f"卡路里: {calories}")
-
+        
         # 存储到 Supabase，直接傳遞已映射好名稱的變數
         store_feeding_record(timestamp, pet_id, amount, weight, laser_distance, power, food_type, calories)
         
