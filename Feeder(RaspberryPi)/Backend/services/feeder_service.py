@@ -9,7 +9,7 @@ def feed_once():
     timestamp = datetime.now().isoformat()
     return {
         "timestamp": timestamp,
-        "pet_id": "74301fcb-5756-4c3f-ae21-810443342bb6", # 如果沒登入，可設為 demo 預設值
+        "pet_id": "43c23d4a-4235-4395-8384-73dbdd7a7ad8", # 如果沒登入，可設為 demo 預設值
         "angle": 45,                   # 對應為 angle 傳給前端
         "height_waste": h1,               # 廚餘重量 = 廚餘感測距離 h1
         "height_feed": h2,                # 飼料剩餘高度 = h2
@@ -36,7 +36,7 @@ def check_status():
     timestamp = datetime.now().isoformat()
     return {
         "timestamp": timestamp,
-        "pet_id": "74301fcb-5756-4c3f-ae21-810443342bb6", # 如果沒登入，可設為 demo 預設值
+        "pet_id": "43c23d4a-4235-4395-8384-73dbdd7a7ad8", # 如果沒登入，可設為 demo 預設值
         "angle": grams,                   # 對應為 angle 傳給前端
         "height_waste": h1,               # 廚餘重量 = 廚餘感測距離 h1
         "height_feed": h2,                # 飼料剩餘高度 = h2
