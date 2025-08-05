@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Home, Utensils, Plus, Loader2, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Home, Utensils, Plus, Loader2, Calendar, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, FeedingRecord } from '../types';
 import mqtt from "mqtt";
@@ -10,7 +10,8 @@ export default function FeedingRecordPage() {
   const [records, setRecords] = useState<FeedingRecord[]>([]);
   const [selectedPet, setSelectedPet] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showNutritionInfo, setShowNutritionInfo] = useState(false);
   const [formData, setFormData] = useState({
@@ -21,8 +22,8 @@ export default function FeedingRecordPage() {
   const [nutritionCalculator, setNutritionCalculator] = useState({
     petType: 'dog',
     weight: '',
-    activityLevel: 'normal', // low, normal, high
-    age: 'adult', // puppy, adult, senior
+    activityLevel: 'normal',
+    age: 'adult',
   });
   interface FoodData {
     food_type: string;
@@ -43,10 +44,11 @@ export default function FeedingRecordPage() {
     calcium: number;
     phosphorus: number;
     moisture: number;
-    calories?: number; // Added calories to the state
+    calories?: number;
   } | null>(null);
+  const location = useLocation();
 
-  // MQTT 控制相關
+  // MQTT 相關
   const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
   const MQTT_TOPIC = "feeder/command";
   const MQTT_USERNAME = "petmanager";
@@ -73,18 +75,6 @@ export default function FeedingRecordPage() {
     }
   };
 
-  useEffect(() => {
-    fetchPets();
-    fetchFoodList();
-  }, []);
-
-  useEffect(() => {
-    if (selectedPet) {
-      fetchFeedingRecords();
-      fetchPetDetails();
-    }
-  }, [selectedPet, selectedDate]);
-
   const fetchPets = async () => {
     try {
       const { data, error } = await supabase
@@ -94,17 +84,22 @@ export default function FeedingRecordPage() {
 
       if (error) throw error;
       setPets(data || []);
-      if (data && data.length > 0) {
+
+      const params = new URLSearchParams(location.search);
+      const petId = params.get('pet');
+
+      if (petId && data?.some(p => p.id === petId)) {
+        setSelectedPet(petId);
+      } else if (data && data.length > 0) {
         setSelectedPet(data[0].id);
       }
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching pets:', error);
-      setLoading(false);
     }
   };
 
   const fetchPetDetails = async () => {
+    if (!selectedPet) return;
     try {
       const { data, error } = await supabase
         .from('pets')
@@ -125,12 +120,12 @@ export default function FeedingRecordPage() {
     }
   };
 
-  const fetchFeedingRecords = async () => {
+  const fetchFeedingRecords = useCallback(async () => {
+    if (!selectedPet) return;
     try {
-      // 計算選定日期的開始和結束時間
       const startDate = new Date(selectedDate);
       startDate.setHours(0, 0, 0, 0);
-      
+
       const endDate = new Date(selectedDate);
       endDate.setHours(23, 59, 59, 999);
 
@@ -150,14 +145,47 @@ export default function FeedingRecordPage() {
         return item;
       });
       setRecords(processedData || []);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching feeding records:', error);
     }
+  }, [selectedPet, selectedDate]);
+
+  const fetchFoodList = async () => {
+    const { data, error } = await supabase.from('food_data').select('*');
+    if (!error && data) setFoodList(data);
   };
+
+  useEffect(() => {
+    fetchPets();
+    fetchFoodList();
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!selectedPet) return;
+
+    setIsRefreshing(true);
+    const fetchData = async () => {
+      await Promise.all([
+        fetchFeedingRecords(),
+        fetchPetDetails(),
+      ]);
+      setIsRefreshing(false);
+    };
+
+    fetchData();
+
+    const intervalId = setInterval(() => {
+      setIsRefreshing(true);
+      fetchData();
+    }, 1000); // 每秒刷新一次
+
+    return () => clearInterval(intervalId);
+  }, [selectedPet, selectedDate, fetchFeedingRecords]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 自動計算 calories
     const food = foodList.find(f => f.food_type === formData.food_type);
     let calories = 0;
     if (food && formData.amount) {
@@ -192,8 +220,6 @@ export default function FeedingRecordPage() {
     }
   };
 
-  // (已移除未用的 calculateNutrition, getRecommendedCalories)
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('zh-TW');
@@ -215,13 +241,6 @@ export default function FeedingRecordPage() {
     setSelectedDate(currentDate.toISOString().split('T')[0]);
   };
 
-  const fetchFoodList = async () => {
-    const { data, error } = await supabase.from('food_data').select('*');
-    console.log('foodList', data, error); // 除錯用
-    if (!error && data) setFoodList(data);
-  };
-
-  // 新增：根據選擇的飼料品牌與餵食量計算營養成分
   useEffect(() => {
     if (selectedFood && formData.amount) {
       const ratio = parseFloat(formData.amount) / 100;
@@ -247,7 +266,7 @@ export default function FeedingRecordPage() {
     }
   }, [selectedFood, formData.amount]);
 
-  if (loading) {
+  if (pets.length === 0 && !selectedPet) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -296,15 +315,27 @@ export default function FeedingRecordPage() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">餵食紀錄</h1>
-          <p className="mt-1 text-gray-500">記錄寵物的飲食狀況</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">餵食紀錄</h1>
+            <p className="mt-1 text-gray-500">記錄寵物的飲食狀況</p>
+          </div>
+          <div className="flex items-center text-sm text-gray-500">
+            {isRefreshing ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Clock className="w-4 h-4 mr-2" />
+            )}
+            <span>
+              {lastUpdated ? `最後更新：${lastUpdated.toLocaleTimeString('zh-TW')}` : '載入中...'}
+            </span>
+          </div>
         </div>
 
         {/* 日期選擇器 */}
         <div className="bg-white rounded-lg shadow mb-8 p-4">
           <div className="flex items-center justify-between">
-            <button 
+            <button
               type="button"
               onClick={goToPreviousDay}
               className="p-2 rounded-full hover:bg-gray-100"
@@ -314,7 +345,7 @@ export default function FeedingRecordPage() {
                 <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
             </button>
-            
+
             <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-blue-500" />
               <input
@@ -327,8 +358,8 @@ export default function FeedingRecordPage() {
                 placeholder="選擇日期"
               />
             </div>
-            
-            <button 
+
+            <button
               onClick={goToNextDay}
               className="p-2 rounded-full hover:bg-gray-100"
               aria-label="前往後一天"
@@ -466,7 +497,7 @@ export default function FeedingRecordPage() {
                                   .from('feeding_records')
                                   .update({ food_type: newType })
                                   .eq('id', record.id);
-                                fetchFeedingRecords(); // 重新載入
+                                fetchFeedingRecords();
                               }}
                               className="border rounded px-2 py-1"
                             >
@@ -483,7 +514,6 @@ export default function FeedingRecordPage() {
                           {record.amount}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {/* getTotalCalories() */}
                           {(() => {
                             const food = foodList.find(f => f.food_type === record.food_type);
                             if (!food) return '--';
@@ -508,42 +538,25 @@ export default function FeedingRecordPage() {
                         總計
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {/* getTotalCalories() */}
+                        {(() => {
+                          const totalCalories = records.reduce((sum, record) => {
+                            const food = foodList.find(f => f.food_type === record.food_type);
+                            if (!food) return sum;
+                            const ratio = Number(record.amount) / 100;
+                            const protein = (food.protein || 0) * ratio;
+                            const fat = (food.fat || 0) * ratio;
+                            const carbs = Math.max(0, (100 - ((food.protein || 0) + (food.fat || 0) + (food.fiber || 0) + (food.moisture || 0))) * ratio);
+                            const calories = protein * 4 + fat * 9 + carbs * 4;
+                            return sum + calories;
+                          }, 0);
+                          return totalCalories.toFixed(1);
+                        })()} kcal
                       </td>
+                      <td></td>
+                      <td></td>
                     </tr>
                   </tbody>
                 </table>
-                {/* 新增：每次餵食的營養成分顯示 */}
-                <div className="mt-4">
-                  <h3 className="text-md font-semibold mb-2">每次餵食營養成分</h3>
-                  <div className="space-y-2">
-                    {records.map((record) => {
-                      const food = foodList.find(f => f.food_type === record.food_type);
-                      if (!food) return null;
-                      const ratio = Number(record.amount) / 100;
-                      const protein = (food.protein || 0) * ratio;
-                      const fat = (food.fat || 0) * ratio;
-                      const fiber = (food.fiber || 0) * ratio;
-                      const calcium = (food.calcium || 0) * ratio;
-                      const phosphorus = (food.phosphorus || 0) * ratio;
-                      const moisture = (food.moisture || 0) * ratio;
-                      const carbs = Math.max(0, (100 - ((food.protein || 0) + (food.fat || 0) + (food.fiber || 0) + (food.moisture || 0))) * ratio);
-                      const calories = protein * 4 + fat * 9 + carbs * 4;
-                      return (
-                        <div key={record.id} className="bg-gray-50 rounded p-3 flex flex-wrap gap-4 items-center">
-                          <span className="font-medium text-gray-700">{new Date(record.fed_at).toLocaleTimeString('zh-TW')} {record.food_type} {record.amount}g</span>
-                          <span>蛋白質: {protein.toFixed(2)}g</span>
-                          <span>脂肪: {fat.toFixed(2)}g</span>
-                          <span>纖維: {fiber.toFixed(2)}g</span>
-                          <span>鈣: {calcium.toFixed(2)}g</span>
-                          <span>磷: {phosphorus.toFixed(2)}g</span>
-                          <span>水分: {moisture.toFixed(2)}g</span>
-                          <span>熱量: {calories.toFixed(1)} kcal</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
               </>
             ) : (
               <div className="py-8 text-center text-gray-500">
@@ -626,7 +639,7 @@ export default function FeedingRecordPage() {
                 </svg>
               </button>
             </div>
-            
+
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">狗狗的每日營養需求</h3>
@@ -653,7 +666,7 @@ export default function FeedingRecordPage() {
                   </li>
                 </ul>
               </div>
-              
+
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">貓咪的每日營養需求</h3>
                 <ul className="list-disc pl-5 space-y-2">
@@ -679,7 +692,7 @@ export default function FeedingRecordPage() {
                   </li>
                 </ul>
               </div>
-              
+
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">注意事項</h3>
                 <ul className="list-disc pl-5 space-y-2">
@@ -690,7 +703,7 @@ export default function FeedingRecordPage() {
                 </ul>
               </div>
             </div>
-            
+
             <div className="mt-6">
               <button
                 onClick={() => setShowNutritionInfo(false)}
