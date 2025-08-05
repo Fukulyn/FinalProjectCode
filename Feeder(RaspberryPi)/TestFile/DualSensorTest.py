@@ -11,7 +11,7 @@ tca = adafruit_tca9548a.TCA9548A(i2c)
 
 # 初始化感測器
 sensor1 = adafruit_vl53l1x.VL53L1X(tca[2])
-sensor2 = adafruit_vl53l1x.VL53L1X(tca[4])
+sensor2 = adafruit_vl53l1x.VL53L1X(tca[6])
 sensor1.start_ranging()
 sensor2.start_ranging()
 

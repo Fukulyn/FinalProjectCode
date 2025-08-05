@@ -15,7 +15,7 @@ def init_dual_sensor():
     global sensor1, sensor2
     try:
         sensor1 = adafruit_vl53l1x.VL53L1X(tca[2])
-        sensor2 = adafruit_vl53l1x.VL53L1X(tca[4])
+        sensor2 = adafruit_vl53l1x.VL53L1X(tca[6])
         sensor1.start_ranging()
         sensor2.start_ranging()
         print("雙感測器初始化完成")
