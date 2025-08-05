@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Plus, Loader2, Heart, Activity, LineChart, BatteryCharging } from 'lucide-react';
+import { Home, Plus, Loader2, Heart, Activity, LineChart, BatteryCharging, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, HealthRecord } from '../types';
 import {
@@ -29,7 +29,7 @@ export default function HealthMonitor() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [records, setRecords] = useState<HealthRecord[]>([]);
   const [selectedPet, setSelectedPet] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('week');
   const [formData, setFormData] = useState({
@@ -39,6 +39,7 @@ export default function HealthMonitor() {
   });
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [stepsValue, setStepsValue] = useState<number | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const location = useLocation();
 
   const getHealthStatus = (type: string, value: number) => {
@@ -70,51 +71,8 @@ export default function HealthMonitor() {
   const heartRateStatus = latestRecord ? getHealthStatus('heart_rate', latestRecord.heart_rate) : 'normal';
   const oxygenStatus = latestRecord ? getHealthStatus('oxygen_level', latestRecord.oxygen_level) : 'normal';
 
-  useEffect(() => {
-    fetchPets();
-    
-    // 檢查 URL 參數是否有指定寵物
-    const params = new URLSearchParams(location.search);
-    const petId = params.get('pet');
-    if (petId) {
-      setSelectedPet(petId);
-    }
-  }, [location]);
-
-  useEffect(() => {
-    if (selectedPet) {
-      fetchHealthRecords();
-    }
-  }, [selectedPet, timeRange]);
-
-  useEffect(() => {
-    fetchBatteryLevel();
-  }, [selectedPet]);
-
-  useEffect(() => {
-    fetchStepsValue();
-  }, [selectedPet]);
-
-  const fetchPets = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('pets')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setPets(data || []);
-      if (data && data.length > 0 && !selectedPet) {
-        setSelectedPet(data[0].id);
-      }
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching pets:', error);
-      setLoading(false);
-    }
-  };
-
-  const fetchHealthRecords = async () => {
+  const fetchHealthRecords = useCallback(async () => {
+    if (!selectedPet) return;
     try {
       let query = supabase
         .from('health_records')
@@ -122,7 +80,6 @@ export default function HealthMonitor() {
         .eq('pet_id', selectedPet)
         .order('recorded_at', { ascending: true });
 
-      // 根據時間範圍過濾
       const now = new Date();
       if (timeRange === 'week') {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -136,12 +93,14 @@ export default function HealthMonitor() {
 
       if (error) throw error;
       setRecords(data || []);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching health records:', error);
     }
-  };
+  }, [selectedPet, timeRange]);
 
-  const fetchBatteryLevel = async () => {
+  const fetchBatteryLevel = useCallback(async () => {
+    if (!selectedPet) return;
     try {
       const { data, error } = await supabase
         .from('health_records')
@@ -156,9 +115,10 @@ export default function HealthMonitor() {
     } catch (error) {
       console.error('Error fetching battery level:', error);
     }
-  };
+  }, [selectedPet]);
 
-  const fetchStepsValue = async () => {
+  const fetchStepsValue = useCallback(async () => {
+    if (!selectedPet) return;
     try {
       const { data, error } = await supabase
         .from('health_records')
@@ -173,7 +133,57 @@ export default function HealthMonitor() {
     } catch (error) {
       console.error('Error fetching steps value:', error);
     }
+  }, [selectedPet]);
+
+  const fetchPets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('pets')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setPets(data || []);
+      
+      const params = new URLSearchParams(location.search);
+      const petId = params.get('pet');
+      
+      if (petId && data?.some(p => p.id === petId)) {
+        setSelectedPet(petId);
+      } else if (data && data.length > 0) {
+        setSelectedPet(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching pets:', error);
+    }
   };
+
+  useEffect(() => {
+    fetchPets();
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!selectedPet) return;
+
+    setIsRefreshing(true);
+    const fetchData = async () => {
+      await Promise.all([
+        fetchHealthRecords(),
+        fetchBatteryLevel(),
+        fetchStepsValue(),
+      ]);
+      setIsRefreshing(false);
+    };
+
+    fetchData();
+
+    const intervalId = setInterval(() => {
+      setIsRefreshing(true);
+      fetchData();
+    }, 1000); // 每秒刷新一次
+
+    return () => clearInterval(intervalId);
+  }, [selectedPet, timeRange, fetchHealthRecords, fetchBatteryLevel, fetchStepsValue]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,7 +205,7 @@ export default function HealthMonitor() {
         oxygen_level: '',
       });
       setShowForm(false);
-      fetchHealthRecords();
+      fetchHealthRecords(); // 手動新增後立即更新資料
     } catch (error) {
       console.error('Error adding health record:', error);
     }
@@ -223,7 +233,6 @@ export default function HealthMonitor() {
     }
   };
 
-  // 圖表配置
   const chartOptions = {
     responsive: true,
     interaction: {
@@ -256,7 +265,7 @@ export default function HealthMonitor() {
   };
 
   const chartData = {
-    labels: records.map(record => 
+    labels: records.map(record =>
       new Date(record.recorded_at).toLocaleString('zh-TW', {
         month: 'numeric',
         day: 'numeric',
@@ -289,7 +298,7 @@ export default function HealthMonitor() {
     ],
   };
 
-  if (loading) {
+  if (pets.length === 0 && !selectedPet) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -337,9 +346,21 @@ export default function HealthMonitor() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">健康監測</h1>
-          <p className="mt-1 text-gray-500">監測寵物的體溫、心率和血氧</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">健康監測</h1>
+            <p className="mt-1 text-gray-500">監測寵物的體溫、心率和血氧</p>
+          </div>
+          <div className="flex items-center text-sm text-gray-500">
+            {isRefreshing ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Clock className="w-4 h-4 mr-2" />
+            )}
+            <span>
+              {lastUpdated ? `最後更新：${lastUpdated.toLocaleTimeString('zh-TW')}` : '載入中...'}
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -360,10 +381,6 @@ export default function HealthMonitor() {
                 {getStatusText(temperatureStatus)}
               </p>
             )}
-            <p className="text-sm text-gray-500 mt-2">
-              最後更新：{latestRecord?.recorded_at ? 
-                new Date(latestRecord.recorded_at).toLocaleString('zh-TW') : '--'}
-            </p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
@@ -383,10 +400,6 @@ export default function HealthMonitor() {
                 {getStatusText(heartRateStatus)}
               </p>
             )}
-            <p className="text-sm text-gray-500 mt-2">
-              最後更新：{latestRecord?.recorded_at ? 
-                new Date(latestRecord.recorded_at).toLocaleString('zh-TW') : '--'}
-            </p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
@@ -405,10 +418,6 @@ export default function HealthMonitor() {
                 {getStatusText(oxygenStatus)}
               </p>
             )}
-            <p className="text-sm text-gray-500 mt-2">
-              最後更新：{latestRecord?.recorded_at ? 
-                new Date(latestRecord.recorded_at).toLocaleString('zh-TW') : '--'}
-            </p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
@@ -520,7 +529,6 @@ export default function HealthMonitor() {
                     const hrStatus = getHealthStatus('heart_rate', record.heart_rate);
                     const o2Status = getHealthStatus('oxygen_level', record.oxygen_level);
                     
-                    // 整體狀態判斷
                     let overallStatus = 'normal';
                     if (tempStatus === 'high' || hrStatus === 'high' || o2Status === 'low') {
                       overallStatus = 'high';
