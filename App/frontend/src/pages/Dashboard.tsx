@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { Link } from 'react-router-dom';
-import { Heart, Utensils, Syringe, Bell, Home } from 'lucide-react';
-import Logo from '../components/Logo';
+import { Heart, Utensils, Syringe, Bell, Home, Menu, PawPrint } from 'lucide-react'; // 導入 Menu 圖示
 import { supabase } from '../lib/supabase';
 import { VaccineRecord } from '../types';
 import { subscribeUserToPush } from '../lib/firebase';
@@ -11,6 +10,7 @@ export default function Dashboard() {
   const { signOut, user } = useAuthStore();
   const [vaccineAlerts, setVaccineAlerts] = useState<VaccineRecord[]>([]);
   const [showAlertPopup, setShowAlertPopup] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false); // 新增的狀態，控制手機版導航顯示
 
   // 檢查疫苗即將到期
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function Dashboard() {
   const menuItems = [
     {
       title: '寵物檔案',
-      icon: <Logo size="sm" showText={false} />,
+      icon: <PawPrint className="w-6 h-6" />, // 使用 lucide-react 的 PawPrint 圖示
       description: '管理寵物基本資訊',
       link: '/pets',
       color: 'bg-blue-500',
@@ -84,7 +84,9 @@ export default function Dashboard() {
                 <span>返回主頁</span>
               </Link>
             </div>
-            <div className="flex items-center gap-4">
+
+            {/* 導航項目 - 在小螢幕下隱藏，大螢幕下顯示 */}
+            <div className="hidden md:flex items-center gap-4">
               {/* 右上方小鈴鐺 */}
               <button className="relative p-2 rounded-full hover:bg-gray-100" onClick={() => setShowAlertPopup(true)}>
                 <Bell className="w-6 h-6 text-gray-700" />
@@ -103,44 +105,6 @@ export default function Dashboard() {
                 <Bell className="w-5 h-5 inline-block mr-1" />
                 訂閱通知
               </button>
-              {showAlertPopup && (
-                <div className="absolute right-4 top-16 z-50 bg-white border rounded shadow-lg p-4 w-80">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-gray-800">疫苗提醒</span>
-                    <button onClick={() => setShowAlertPopup(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-                  </div>
-                  {vaccineAlerts.length === 0 ? (
-                    <div className="text-gray-500">目前沒有即將到期的疫苗</div>
-                  ) : (
-                    <ul className="space-y-2">
-                      {vaccineAlerts.map(alert => {
-                        const dueDate = alert.next_due_date ? new Date(alert.next_due_date) : null;
-                        
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-
-                        if (dueDate) {
-                          dueDate.setHours(0, 0, 0, 0);
-                        }
-                        
-                        const days = dueDate ? Math.round((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
-
-                        return (
-                          <li key={alert.id} className="flex flex-col text-sm">
-                            <span className="font-medium text-gray-700">
-                              {alert.pets?.name ? `${alert.pets.name}：` : ''}{alert.vaccine_name}
-                            </span>
-                            <span>下次接種日：{alert.next_due_date}</span>
-                            <span className={'text-yellow-600'}>
-                              {days === 0 ? '今天到期' : `還剩 ${days} 天`}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              )}
               <span className="mr-4 text-gray-600">{user?.email}</span>
               <button
                 onClick={signOut}
@@ -149,8 +113,107 @@ export default function Dashboard() {
                 登出
               </button>
             </div>
+
+            {/* 漢堡包按鈕 - 在小螢幕下顯示，大螢幕下隱藏 */}
+            <div className="md:hidden flex items-center">
+              <button
+                className="p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                onClick={() => setShowMobileMenu(!showMobileMenu)} // 使用新的狀態控制手機版導航顯示
+              >
+                <Menu className="w-6 h-6 text-gray-700" /> {/* 漢堡包圖示 */}
+              </button>
+            </div>
+
           </div>
+
+          {/* 手機版導航選單 - 預設隱藏，點擊漢堡包按鈕時顯示 */}
+          <div className={`${showMobileMenu ? 'block' : 'hidden'} md:hidden`}> {/* 使用新的狀態控制顯示 */}
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                {/* 手機版菜單項目 - 您可以根據需求調整內容和樣式 */}
+                {/* 例如：將桌面版的導航項目複製過來，或者創建一個精簡版 */}
+                <button className="w-full text-left relative p-2 rounded-md hover:bg-gray-100" onClick={() => {
+                   setShowAlertPopup(true); // 點擊通知按鈕時仍然顯示疫苗提醒
+                   setShowMobileMenu(false); // 點擊後關閉手機版導航
+                }}>
+                  <Bell className="w-6 h-6 text-gray-700 inline-block mr-2" />
+                  通知
+                  {vaccineAlerts.length > 0 && (
+                    <span className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                      !
+                    </span>
+                  )}
+                </button>
+                 <button
+                  className="w-full text-left p-2 rounded-md bg-blue-100 hover:bg-blue-200 text-blue-700"
+                  onClick={() => {
+                    if (user) {
+                              subscribeUserToPush(user.id);
+                              setShowMobileMenu(false); // 點擊後關閉手機版導航
+                        }
+                    
+                  }}
+                  title="訂閱推播通知"
+                >
+                  <Bell className="w-5 h-5 inline-block mr-1" />
+                  訂閱通知
+                </button>
+                <div className="block px-3 py-2 text-base font-medium text-gray-700">
+                    {user?.email}
+                </div>
+                <button
+                  onClick={() => {
+                    signOut();
+                    setShowMobileMenu(false); // 點擊後關閉手機版導航
+                  }}
+                  className="w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-100 rounded-md"
+                >
+                  登出
+                </button>
+            </div>
+          </div>
+
+
         </div>
+
+        {/* 疫苗提醒彈出視窗 - 位置可能需要調整，以確保在手機版導航下方顯示 */}
+        {showAlertPopup && (
+          <div className="absolute right-4 top-16 z-50 bg-white border rounded shadow-lg p-4 w-80">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-bold text-gray-800">疫苗提醒</span>
+              <button onClick={() => setShowAlertPopup(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            {vaccineAlerts.length === 0 ? (
+              <div className="text-gray-500">目前沒有即將到期的疫苗</div>
+            ) : (
+              <ul className="space-y-2">
+                {vaccineAlerts.map(alert => {
+                  const dueDate = alert.next_due_date ? new Date(alert.next_due_date) : null;
+
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+
+                  if (dueDate) {
+                    dueDate.setHours(0, 0, 0, 0);
+                  }
+
+                  const days = dueDate ? Math.round((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+                  return (
+                    <li key={alert.id} className="flex flex-col text-sm">
+                      <span className="font-medium text-gray-700">
+                        {alert.pets?.name ? `${alert.pets.name}：` : ''}{alert.vaccine_name}
+                      </span>
+                      <span>下次接種日：{alert.next_due_date}</span>
+                      <span className={'text-yellow-600'}>
+                        {days === 0 ? '今天到期' : `還剩 ${days} 天`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
       </nav>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
