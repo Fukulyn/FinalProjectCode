@@ -1,4 +1,4 @@
-from services.feeder_service import feed_once, feed_until_target, check_status, open_gate, close_gate
+from services.feeder_service import feed_once, feed_until_target, check_status, open_gate, close_gate, schedule_feeding, cancel_scheduled_feeding, get_scheduled_feeding
 from flask import jsonify
 import json
 import time
@@ -68,13 +68,11 @@ def handle_mqtt_message(client, payload):
             }))
 
     elif payload == "status":
-        if not is_active:
-            print("嘗試 status 但系統未啟動")
-            client.publish("pet/manager/topic/status", json.dumps({
-                "status": "error",
-                "message": "System not active. Please send 'start' first."
-            }))
-            return
+        result = check_status()
+        # 添加系統狀態信息
+        result["system_status"] = "active" if is_active else "idle"
+        result["scheduled_feeding"] = get_scheduled_feeding()
+        client.publish("pet/manager/topic/status", json.dumps(result))
         
     elif payload == "open_gate":
         result = open_gate()
@@ -84,8 +82,41 @@ def handle_mqtt_message(client, payload):
         result = close_gate()
         client.publish("pet/manager/topic/close_gate", json.dumps(result))
 
-        result = check_status()
-        client.publish("pet/manager/topic/status", json.dumps(result))
+    elif payload.startswith("schedule_feed"):
+        try:
+            # 指令格式: schedule_feed YYYY-MM-DD HH:MM grams
+            parts = payload.split()
+            if len(parts) >= 4:
+                _, date_str, time_str, grams = parts[:4]
+                datetime_str = f"{date_str} {time_str}"
+                grams = float(grams)
+                success = schedule_feeding(datetime_str, grams)
+                if success:
+                    client.publish("pet/manager/topic/schedule_feed", json.dumps({
+                        "status": "scheduled",
+                        "datetime": datetime_str,
+                        "grams": grams
+                    }))
+                else:
+                    client.publish("pet/manager/topic/schedule_feed", json.dumps({
+                        "status": "error",
+                        "message": "設定時間已過或格式錯誤"
+                    }))
+            else:
+                client.publish("pet/manager/topic/schedule_feed", json.dumps({
+                    "status": "error",
+                    "message": "指令格式錯誤，應為: schedule_feed YYYY-MM-DD HH:MM grams"
+                }))
+        except Exception as e:
+            client.publish("pet/manager/topic/schedule_feed", json.dumps({
+                "status": "error",
+                "message": str(e)
+            }))
+    elif payload == "cancel_schedule":
+        cancel_scheduled_feeding()
+        client.publish("pet/manager/topic/schedule_feed", json.dumps({
+            "status": "cancelled"
+        }))
 
     else:
         client.publish("pet/manager/topic/status", json.dumps({
