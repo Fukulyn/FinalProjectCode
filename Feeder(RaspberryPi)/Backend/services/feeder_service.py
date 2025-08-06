@@ -45,6 +45,9 @@ def check_status():
         "angle": grams,                   # 對應為 angle 傳給前端
         "height_waste": h1,               # 廚餘重量 = 廚餘感測距離 h1
         "height_feed": h2,                # 飼料剩餘高度 = h2
+        "power": 3.7,                     # 可選：電池電量（假設）
+        "food_type": "default_food",
+        "calories": grams * 2             # 可選：熱量估算
     }
 def open_gate():
     open_waste_gate()

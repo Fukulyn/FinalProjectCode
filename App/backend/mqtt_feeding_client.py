@@ -64,7 +64,7 @@ def on_message(client, userdata, msg):
         pet_id = data.get('pet_id')
         
         # 將 MQTT 訊息中的 'Weight' (本次餵食飼料重量) 存入 Supabase 的 'amount' 欄位
-        amount = data.get('Weight') # 注意這裡使用大寫 'Weight'，與您的範例訊息一致
+        amount = data.get('amount') # 注意這裡使用大寫 'Weight'，與您的範例訊息一致
         
         weight = data.get('height_waste')      # MQTT 的 'height_waste' 對應 Supabase 的 'weight'
         laser_distance = data.get('height_feed') # MQTT 的 'height_feed' 對應 Supabase 的 'laser_distance'

@@ -6,9 +6,6 @@ import requests
 from pywebpush import webpush, WebPushException
 import json
 import socket
-import paho.mqtt.client as mqtt
-import threading
-from mqtt_status_client import get_latest_status
 
 app = Flask(__name__)
 CORS(app)  # 啟用 CORS 支援
@@ -36,30 +33,6 @@ except Exception as e:
 VAPID_PUBLIC_KEY = "BPkjF5Q8CJx9B4i5rC_0INNb1w66HWZSw4TEd-laFk_OrmWvOirz24LuhJYUx1DoXRHhGY6NFSCDGEHfwLdZnGY"
 VAPID_PRIVATE_KEY = "GXJHwmJpMzUbqh5LDvfO0vruc63Y4sTVHkgPcyWT0lE"
 VAPID_CLAIMS = {"sub": "mailto:your@email.com"}
-
-# MQTT 配置
-MQTT_BROKER_URL = "broker.emqx.io"
-MQTT_PORT = 1883
-MQTT_USERNAME = "petmanager"
-MQTT_PASSWORD = "petmanager"
-
-# 全域 MQTT 客戶端
-mqtt_client = None
-
-def init_mqtt():
-    global mqtt_client
-    client = mqtt.Client()
-    client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-    client.connect(MQTT_BROKER_URL, MQTT_PORT, 60)
-    mqtt_client = client
-    return client
-
-def send_mqtt_command(command):
-    if mqtt_client:
-        mqtt_client.publish("feeder/command", command)
-        print(f"已發送 MQTT 指令: {command}")
-        return True
-    return False
 
 @app.route('/api/save-subscription', methods=['POST', 'OPTIONS'])
 def save_subscription():
@@ -123,91 +96,5 @@ def send_webpush():
         print(f"發送推播錯誤: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/schedule_feed', methods=['POST'])
-def schedule_feed():
-    data = request.get_json()
-    date_str = data.get('date')  # "YYYY-MM-DD" 格式
-    time_str = data.get('time')  # "HH:MM" 格式
-    grams = data.get('grams')
-    
-    if not date_str or not time_str or not grams:
-        return jsonify({'error': '缺少 date、time 或 grams 參數'}), 400
-    
-    try:
-        grams = float(grams)
-        # 組合日期和時間
-        datetime_str = f"{date_str} {time_str}"
-        command = f"schedule_feed {datetime_str} {grams}"
-        success = send_mqtt_command(command)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': f'已設定 {date_str} {time_str} 餵食 {grams}g'
-            })
-        else:
-            return jsonify({'error': 'MQTT 連線失敗'}), 500
-            
-    except ValueError:
-        return jsonify({'error': 'grams 必須是數字'}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/cancel_schedule', methods=['POST'])
-def cancel_schedule():
-    try:
-        success = send_mqtt_command("cancel_schedule")
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': '已取消定時餵食'
-            })
-        else:
-            return jsonify({'error': 'MQTT 連線失敗'}), 500
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/check_status', methods=['GET'])
-def check_status():
-    try:
-        success = send_mqtt_command("status")
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': '已發送狀態查詢指令'
-            })
-        else:
-            return jsonify({'error': 'MQTT 連線失敗'}), 500
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/get_status', methods=['GET'])
-def get_status():
-    try:
-        status_data = get_latest_status()
-        if status_data["status"]:
-            return jsonify({
-                'success': True,
-                'data': status_data
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': '尚未收到狀態信息，請先查詢狀態'
-            })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 if __name__ == '__main__':
-    # 初始化 MQTT 連線
-    try:
-        init_mqtt()
-        print("MQTT 連線已初始化")
-    except Exception as e:
-        print(f"MQTT 連線失敗: {e}")
-    
     app.run(port=3001, debug=True) 

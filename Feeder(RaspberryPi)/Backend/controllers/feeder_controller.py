@@ -16,7 +16,8 @@ def broadcast_status_loop(mqtt_client, interval=30):
         try:
             state = "active" if is_active else "idle"
             data = check_status()
-            data["status"] = state  # 覆蓋成 active/idle
+            data["system_status"] = state  # 使用 system_status 欄位
+            data["scheduled_feeding"] = get_scheduled_feeding()
             mqtt_client.publish("pet/manager/topic/status", json.dumps(data))
             print(f"[狀態推送] {state} @ {data['timestamp']}")
         except Exception as e:

@@ -8,3 +8,5 @@ os.chdir(os.path.dirname(__file__))
 subprocess.Popen(["python", "mqtt_collar_client.py"])
 subprocess.Popen(["python", "mqtt_feeding_client.py"])
 subprocess.Popen(["python", "mqtt_status_client.py"])
+subprocess.Popen(["python", "app.py"])
+

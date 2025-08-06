@@ -7,58 +7,93 @@ import requests
 import time
 import json
 
-def test_status_query():
-    """測試狀態查詢功能"""
-    base_url = "http://localhost:3001"
+# 後端 API 基礎 URL
+base_url = "http://localhost:3001"
+
+def test_status_apis():
+    print("=== 測試餵食器狀態 API ===")
     
-    print("=== 測試狀態查詢功能 ===")
-    
-    # 1. 發送狀態查詢指令
-    print("\n1. 發送狀態查詢指令...")
+    # 測試 1: 查詢狀態
+    print("\n1. 測試查詢狀態 API...")
     try:
         response = requests.get(f"{base_url}/api/check_status")
-        result = response.json()
-        print(f"回應: {json.dumps(result, indent=2, ensure_ascii=False)}")
-        
-        if result.get('success'):
-            print("✓ 狀態查詢指令發送成功")
+        print(f"狀態碼: {response.status_code}")
+        if response.status_code == 200:
+            result = response.json()
+            print(f"回應: {json.dumps(result, indent=2, ensure_ascii=False)}")
         else:
-            print("✗ 狀態查詢指令發送失敗")
-            return
-            
+            print(f"錯誤回應: {response.text}")
     except Exception as e:
-        print(f"✗ 發送狀態查詢指令時出錯: {e}")
-        return
+        print(f"查詢狀態失敗: {e}")
     
-    # 2. 等待一下讓餵食器回應
-    print("\n2. 等待餵食器回應...")
-    time.sleep(3)
+    # 等待一秒讓狀態更新
+    print("\n等待狀態更新...")
+    time.sleep(2)
     
-    # 3. 獲取狀態信息
-    print("\n3. 獲取狀態信息...")
+    # 測試 2: 獲取狀態
+    print("\n2. 測試獲取狀態 API...")
     try:
         response = requests.get(f"{base_url}/api/get_status")
-        result = response.json()
-        print(f"回應: {json.dumps(result, indent=2, ensure_ascii=False)}")
-        
-        if result.get('success'):
-            print("✓ 成功獲取狀態信息")
-            status_data = result['data']['status']
-            print(f"系統狀態: {status_data.get('system_status', '未知')}")
-            print(f"當前重量: {status_data.get('angle', 0)}g")
-            print(f"飼料高度: {status_data.get('height_feed', 0)}mm")
-            print(f"廚餘高度: {status_data.get('height_waste', 0)}mm")
-            print(f"電量: {status_data.get('power', 0)}V")
+        print(f"狀態碼: {response.status_code}")
+        if response.status_code == 200:
+            result = response.json()
+            print(f"回應: {json.dumps(result, indent=2, ensure_ascii=False)}")
             
-            if status_data.get('scheduled_feeding'):
-                print(f"定時餵食: {status_data['scheduled_feeding']['datetime']} - {status_data['scheduled_feeding']['grams']}g")
+            # 檢查狀態資料結構
+            if result.get('success') and result.get('data', {}).get('status'):
+                status_data = result['data']['status']
+                print(f"\n狀態資料解析:")
+                print(f"  系統狀態: {status_data.get('system_status', 'N/A')}")
+                print(f"  當前重量: {status_data.get('angle', 'N/A')}g")
+                print(f"  飼料高度: {status_data.get('height_feed', 'N/A')}mm")
+                print(f"  廚餘高度: {status_data.get('height_waste', 'N/A')}mm")
+                print(f"  電量: {status_data.get('power', 'N/A')}V")
+                print(f"  食物類型: {status_data.get('food_type', 'N/A')}")
+                print(f"  卡路里: {status_data.get('calories', 'N/A')}kcal")
+                
+                if status_data.get('scheduled_feeding'):
+                    scheduled = status_data['scheduled_feeding']
+                    print(f"  定時餵食: {scheduled.get('datetime', 'N/A')} ({scheduled.get('grams', 'N/A')}g)")
+                else:
+                    print(f"  定時餵食: 無設定")
             else:
-                print("定時餵食: 無設定")
+                print("尚未收到狀態資料")
         else:
-            print(f"✗ 獲取狀態信息失敗: {result.get('message', '未知錯誤')}")
-            
+            print(f"錯誤回應: {response.text}")
     except Exception as e:
-        print(f"✗ 獲取狀態信息時出錯: {e}")
+        print(f"獲取狀態失敗: {e}")
+    
+    # 測試 3: 連續查詢測試
+    print("\n3. 測試連續查詢...")
+    for i in range(3):
+        print(f"\n第 {i+1} 次查詢:")
+        try:
+            # 查詢狀態
+            check_response = requests.get(f"{base_url}/api/check_status")
+            if check_response.status_code == 200:
+                print("  ✓ 查詢狀態成功")
+                
+                # 等待一秒
+                time.sleep(1)
+                
+                # 獲取狀態
+                get_response = requests.get(f"{base_url}/api/get_status")
+                if get_response.status_code == 200:
+                    result = get_response.json()
+                    if result.get('success') and result.get('data', {}).get('status'):
+                        status = result['data']['status']
+                        print(f"  ✓ 獲取狀態成功 - 系統狀態: {status.get('system_status', 'N/A')}")
+                    else:
+                        print("  ⚠ 尚未收到狀態資料")
+                else:
+                    print(f"  ✗ 獲取狀態失敗: {get_response.status_code}")
+            else:
+                print(f"  ✗ 查詢狀態失敗: {check_response.status_code}")
+        except Exception as e:
+            print(f"  ✗ 查詢失敗: {e}")
+        
+        if i < 2:  # 最後一次不需要等待
+            time.sleep(2)
 
 if __name__ == "__main__":
-    test_status_query() 
+    test_status_apis() 

@@ -459,198 +459,6 @@ export default function FeedingRecordPage() {
           </div>
         </div>
 
-                        {/* 定時餵食設定區塊 */}
-                <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 mb-8">
-                  <h3 className="text-lg font-bold mb-4">定時餵食設定</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">餵食日期</label>
-                        <input
-                          id="scheduleDate"
-                          type="date"
-                          className="border rounded px-3 py-2 w-full"
-                          min={new Date().toISOString().split('T')[0]}
-                          title="選擇餵食日期"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">餵食時間</label>
-                        <input
-                          id="scheduleTime"
-                          type="time"
-                          className="border rounded px-3 py-2 w-full"
-                          placeholder="HH:MM"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">餵食份量 (g)</label>
-                        <input
-                          id="scheduleGrams"
-                          type="number"
-                          className="border rounded px-3 py-2 w-full"
-                          placeholder="20"
-                          min="1"
-                          max="100"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                                  <button
-                        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                        onClick={async () => {
-                          const date = (document.getElementById("scheduleDate") as HTMLInputElement).value;
-                          const time = (document.getElementById("scheduleTime") as HTMLInputElement).value;
-                          const grams = (document.getElementById("scheduleGrams") as HTMLInputElement).value;
-                          
-                          if (!date || !time || !grams) {
-                            alert("請輸入餵食日期、時間和份量");
-                            return;
-                          }
-                          
-                          try {
-                            const response = await fetch('/api/schedule_feed', {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                date: date,
-                                time: time,
-                                grams: parseFloat(grams)
-                              })
-                            });
-                            
-                            const result = await response.json();
-                            if (result.success) {
-                              alert(`定時餵食已設定：${date} ${time} 餵食 ${grams}g`);
-                            } else {
-                              alert(`設定失敗：${result.error}`);
-                            }
-                          } catch (error) {
-                            alert(`設定失敗：${error}`);
-                          }
-                        }}
-                      >
-                        設定定時餵食
-                      </button>
-                      <button
-                        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-                        onClick={async () => {
-                          try {
-                            const response = await fetch('/api/cancel_schedule', {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              }
-                            });
-                            
-                            const result = await response.json();
-                            if (result.success) {
-                              alert("已取消定時餵食");
-                            } else {
-                              alert(`取消失敗：${result.error}`);
-                            }
-                          } catch (error) {
-                            alert(`取消失敗：${error}`);
-                          }
-                        }}
-                      >
-                        取消定時餵食
-                      </button>
-                    </div>
-                                <div className="text-sm text-gray-600">
-                        <p>• 定時餵食會在指定日期和時間自動執行一次餵食</p>
-                        <p>• 請選擇未來的日期和時間</p>
-                        <p>• 餵食完成後會自動清除排程</p>
-                        <p>• 如需重複排程，請重新設定</p>
-                      </div>
-                  </div>
-                </div>
-
-                    {/* 狀態查詢區塊 */}
-                    <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 mb-8">
-                      <h3 className="text-lg font-bold mb-4">餵食器狀態查詢</h3>
-                      <div className="space-y-4">
-                        <div className="flex gap-2">
-                          <button
-                            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                            onClick={async () => {
-                              try {
-                                const response = await fetch('/api/check_status', {
-                                  method: 'GET',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                  }
-                                });
-                                
-                                const result = await response.json();
-                                if (result.success) {
-                                  alert("已發送狀態查詢指令，請稍後點擊「獲取狀態」查看結果");
-                                } else {
-                                  alert(`查詢失敗：${result.error}`);
-                                }
-                              } catch (error) {
-                                alert(`查詢失敗：${error}`);
-                              }
-                            }}
-                          >
-                            查詢狀態
-                          </button>
-                          <button
-                            className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
-                            onClick={async () => {
-                              try {
-                                const response = await fetch('/api/get_status', {
-                                  method: 'GET',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                  }
-                                });
-                                
-                                const result = await response.json();
-                                if (result.success) {
-                                  const statusData = result.data.status;
-                                  const timestamp = result.data.timestamp;
-                                  
-                                  let statusText = `狀態查詢時間: ${timestamp}\n\n`;
-                                  statusText += `系統狀態: ${statusData.system_status || '未知'}\n`;
-                                  statusText += `當前重量: ${statusData.angle || 0}g\n`;
-                                  statusText += `飼料高度: ${statusData.height_feed || 0}mm\n`;
-                                  statusText += `廚餘高度: ${statusData.height_waste || 0}mm\n`;
-                                  statusText += `電量: ${statusData.power || 0}V\n`;
-                                  statusText += `食物類型: ${statusData.food_type || 'default_food'}\n`;
-                                  statusText += `卡路里: ${statusData.calories || 0}\n`;
-                                  
-                                  if (statusData.scheduled_feeding) {
-                                    statusText += `\n定時餵食設定:\n`;
-                                    statusText += `時間: ${statusData.scheduled_feeding.datetime}\n`;
-                                    statusText += `份量: ${statusData.scheduled_feeding.grams}g\n`;
-                                  } else {
-                                    statusText += `\n定時餵食: 無設定`;
-                                  }
-                                  
-                                  alert(statusText);
-                                } else {
-                                  alert(`獲取狀態失敗：${result.message}`);
-                                }
-                              } catch (error) {
-                                alert(`獲取狀態失敗：${error}`);
-                              }
-                            }}
-                          >
-                            獲取狀態
-                          </button>
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          <p>• 點擊「查詢狀態」發送查詢指令到餵食器</p>
-                          <p>• 點擊「獲取狀態」查看最新的狀態信息</p>
-                          <p>• 狀態信息包括重量、飼料高度、廚餘高度、電量等</p>
-                          <p>• 也會顯示當前是否有定時餵食設定</p>
-                        </div>
-                      </div>
-                    </div>
-
         {/* 餵食紀錄 */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -668,8 +476,8 @@ export default function FeedingRecordPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">飼料種類</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">餵食量</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">熱量</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">飼料剩餘高度</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">廚餘容量高度</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">飼料剩餘量</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">廚餘重量</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -721,7 +529,7 @@ export default function FeedingRecordPage() {
                           {record.laser_distance !== undefined ? `${record.laser_distance} mm` : '--'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {record.weight !== undefined ? `${record.weight} mm` : '--'}
+                          {record.weight !== undefined ? `${record.weight} g` : '--'}
                         </td>
                       </tr>
                     ))}
