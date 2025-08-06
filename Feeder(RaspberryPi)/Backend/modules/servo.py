@@ -4,7 +4,7 @@ import RPi.GPIO as GPIO
 
 # --- 常數設定 ---
 SERVO_FEED_PIN    = 16       # 餵食馬達 GPIO 腳位
-SERVO_WASTE_PIN   = 5       # 廚餘閘門 GPIO 腳位
+SERVO_WASTE_PIN   = 6       # 廚餘閘門 GPIO 腳位
 SERVO_FREQUENCY   = 50      # MG90S 建議 50Hz
 FIXED_DUTY        = 9     # 餵食用固定 DutyCycle
 FIXED_DUTY_2      = 2
