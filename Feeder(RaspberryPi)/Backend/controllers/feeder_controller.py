@@ -75,12 +75,26 @@ def handle_mqtt_message(client, payload):
         client.publish("pet/manager/topic/status", json.dumps(result))
         
     elif payload == "open_gate":
+        if not is_active:
+            print("嘗試開啟閘門但系統未啟動")
+            client.publish("pet/manager/topic/feeding", json.dumps({
+                "status": "error",
+                "message": "System not active. Please send 'start' first."
+            }))
+            return
         result = open_gate()
-        client.publish("pet/manager/topic/open_gate", json.dumps(result))
+        client.publish("pet/manager/topic/feeding", json.dumps(result))
 
     elif payload == "close_gate":
+        if not is_active:
+            print("嘗試關閉閘門但系統未啟動")
+            client.publish("pet/manager/topic/feeding", json.dumps({
+                "status": "error",
+                "message": "System not active. Please send 'start' first."
+            }))
+            return
         result = close_gate()
-        client.publish("pet/manager/topic/close_gate", json.dumps(result))
+        client.publish("pet/manager/topic/feeding", json.dumps(result))
 
     elif payload.startswith("schedule_feed"):
         try:
