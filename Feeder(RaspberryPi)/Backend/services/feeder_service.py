@@ -31,7 +31,7 @@ def feed_until_target(target_grams):
     return {
         "timestamp": timestamp,
         "pet_id": "4bec8a69-6190-4094-b506-73aacd47e562", # 如果沒登入，可設為 demo 預設值
-        "amount": 10,                   # 對應為 angle 傳給前端
+        "amount": target_grams,                   # 對應為 angle 傳給前端
         "height_waste": h1,               # 廚餘重量 = 廚餘感測距離 h1
         "height_feed": h2,                # 飼料剩餘高度 = h2
         "power": 3.7,                     # 可選：電池電量（假設）

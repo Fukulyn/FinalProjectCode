@@ -44,14 +44,14 @@ def handle_mqtt_message(client, payload):
                 "message": "System not active. Please send 'start' first."
             }))
             return
-
+        print("[控制器] 收到餵食指令，執行 feed_once")
         result = feed_once()
         client.publish("pet/manager/topic/feeding", json.dumps(result))
 
     elif payload.startswith("feed_until"):
         if not is_active:
             print("嘗試 feed_until 但系統未啟動")
-            client.publish("pet/manager/topic/feed_until", json.dumps({
+            client.publish("pet/manager/topic/feeding", json.dumps({
                 "status": "error",
                 "message": "System not active. Please send 'start' first."
             }))
@@ -60,9 +60,9 @@ def handle_mqtt_message(client, payload):
         try:
             target = float(payload.split()[1])
             result = feed_until_target(target)
-            client.publish("pet/manager/topic/feed_until", json.dumps(result))
+            client.publish("pet/manager/topic/feeding", json.dumps(result))
         except:
-            client.publish("pet/manager/topic/feed_until", json.dumps({
+            client.publish("pet/manager/topic/feeding", json.dumps({
                 "status": "error",
                 "message": "Invalid command. Usage: feed_until 25"
             }))

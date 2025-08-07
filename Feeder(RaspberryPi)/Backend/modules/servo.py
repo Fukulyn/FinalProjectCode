@@ -6,9 +6,9 @@ import RPi.GPIO as GPIO
 SERVO_FEED_PIN    = 16       # 餵食馬達 GPIO 腳位
 SERVO_WASTE_PIN   = 6       # 廚餘閘門 GPIO 腳位
 SERVO_FREQUENCY   = 50      # MG90S 建議 50Hz
-FIXED_DUTY        = 9     # 餵食用固定 DutyCycle
+FIXED_DUTY        = 10     # 餵食用固定 DutyCycle
 FIXED_DUTY_2      = 2
-ESTIMATED_GRAM    = 5.0     # 假設每次餵這樣的克數（可自訂）
+ESTIMATED_GRAM    = 10    # 假設每次餵這樣的克數（可自訂）
 
 # PWM 物件
 pwm_feed = None
@@ -39,8 +39,11 @@ def feed():
     """
     print(f"[餵食中] DutyCycle: {FIXED_DUTY}")
     pwm_feed.ChangeDutyCycle(FIXED_DUTY)
+    time.sleep(1)
     time.sleep(0.5)
     pwm_feed.ChangeDutyCycle(FIXED_DUTY_2)
+    time.sleep(1)
+    time.sleep(0.5)
     pwm_feed.ChangeDutyCycle(0)
     print(f"[完成] 餵食 {ESTIMATED_GRAM} g @ {datetime.now().isoformat()}")
     return ESTIMATED_GRAM
