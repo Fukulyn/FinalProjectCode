@@ -18,8 +18,7 @@ def broadcast_status_loop(mqtt_client, interval=30):
             data = check_status()
             data["system_status"] = state  # 使用 system_status 欄位
             data["scheduled_feeding"] = get_scheduled_feeding()
-            mqtt_client.publish("pet/manager/topic/status", json.dumps(data))
-            print(f"[狀態推送] {state} @ {data['timestamp']}")
+            print(f"{state} @ {data['timestamp']}")
         except Exception as e:
             print(f"[狀態推送錯誤] {e}")
         time.sleep(interval)
