@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Utensils, Plus, Loader2, Calendar, Clock } from 'lucide-react';
+import { Home, Utensils, Plus, Loader2, Calendar, Clock, Timer, Settings, Play, Pause, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, FeedingRecord } from '../types';
 import mqtt from "mqtt";
@@ -14,11 +14,30 @@ export default function FeedingRecordPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showNutritionInfo, setShowNutritionInfo] = useState(false);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [formData, setFormData] = useState({
     food_type: '',
     amount: '',
     calories: '',
   });
+  const [scheduleData, setScheduleData] = useState({
+    time: '',
+    food_type: '',
+    amount: '',
+    days: [] as string[],
+    enabled: true,
+  });
+  const [schedules, setSchedules] = useState<Array<{
+    id: string;
+    pet_id: string;
+    time: string;
+    food_type: string;
+    amount: number;
+    days: string[];
+    enabled: boolean;
+    created_at: string;
+  }>>([]);
+  const [activeSchedules, setActiveSchedules] = useState<Set<string>>(new Set());
   const [nutritionCalculator, setNutritionCalculator] = useState({
     petType: 'dog',
     weight: '',
@@ -55,6 +74,10 @@ export default function FeedingRecordPage() {
   const MQTT_PASSWORD = "petmanager";
   const mqttClientRef = React.useRef<mqtt.MqttClient | null>(null);
 
+  // 定時器相關
+  const scheduleTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   React.useEffect(() => {
     const client = mqtt.connect(MQTT_BROKER, {
       username: MQTT_USERNAME,
@@ -69,11 +92,179 @@ export default function FeedingRecordPage() {
   const sendFeederCommand = (cmd: string) => {
     if (mqttClientRef.current && mqttClientRef.current.connected) {
       mqttClientRef.current.publish(MQTT_TOPIC, cmd);
-      alert(`已傳送指令: ${cmd}`);
+      console.log(`已傳送指令: ${cmd}`);
     } else {
-      alert("MQTT 尚未連線，請稍後再試。");
+      console.log("MQTT 尚未連線，請稍後再試。");
     }
   };
+
+  // 定時餵食相關函數
+  const fetchSchedules = async () => {
+    if (!selectedPet) return;
+    try {
+      const { data, error } = await supabase
+        .from('feeding_schedules')
+        .select('*')
+        .eq('pet_id', selectedPet)
+        .order('time');
+
+      if (error) throw error;
+      setSchedules(data || []);
+    } catch (error) {
+      console.error('Error fetching schedules:', error);
+    }
+  };
+
+  // 修正定時設定表單 - 包含秒的輸入
+  const handleScheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // 自動將時間的秒位設為 00（如果沒有輸入秒）
+    let adjustedTime = scheduleData.time;
+    if (adjustedTime && adjustedTime.length === 5) {
+      // 如果只輸入 HH:MM，自動加上 :00
+      adjustedTime = adjustedTime + ':00';
+    }
+    
+    try {
+      const { error } = await supabase.from('feeding_schedules').insert([
+        {
+          pet_id: selectedPet,
+          time: adjustedTime, // 使用包含秒的時間
+          food_type: scheduleData.food_type,
+          amount: parseFloat(scheduleData.amount),
+          days: scheduleData.days,
+          enabled: scheduleData.enabled,
+        },
+      ]);
+
+      if (error) throw error;
+
+      setScheduleData({
+        time: '',
+        food_type: '',
+        amount: '',
+        days: [],
+        enabled: true,
+      });
+      setShowScheduleForm(false);
+      fetchSchedules();
+      alert('定時餵食設定已儲存');
+    } catch (error) {
+      console.error('Error adding schedule:', error);
+      alert('儲存失敗，請重試');
+    }
+  };
+
+  // 修正時間輸入處理 - 支援秒的輸入
+  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let timeValue = e.target.value;
+    
+    // 如果輸入的是 HH:MM 格式，自動加上 :00
+    if (timeValue && timeValue.length === 5 && timeValue.includes(':')) {
+      timeValue = timeValue + ':00';
+    }
+    
+    setScheduleData({ ...scheduleData, time: timeValue });
+  };
+
+  const toggleSchedule = async (scheduleId: string, enabled: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('feeding_schedules')
+        .update({ enabled })
+        .eq('id', scheduleId);
+
+      if (error) throw error;
+      fetchSchedules();
+    } catch (error) {
+      console.error('Error updating schedule:', error);
+    }
+  };
+
+  const deleteSchedule = async (scheduleId: string) => {
+    if (!confirm('確定要刪除此定時餵食設定嗎？')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('feeding_schedules')
+        .delete()
+        .eq('id', scheduleId);
+
+      if (error) throw error;
+      fetchSchedules();
+      alert('定時餵食設定已刪除');
+    } catch (error) {
+      console.error('Error deleting schedule:', error);
+    }
+  };
+
+  const handleDayToggle = (day: string) => {
+    setScheduleData(prev => ({
+      ...prev,
+      days: prev.days.includes(day)
+        ? prev.days.filter(d => d !== day)
+        : [...prev.days, day]
+    }));
+  };
+
+
+
+  // 記錄定時餵食到資料庫 - 修正時區問題
+  const recordScheduledFeeding = async (schedule: any) => {
+    try {
+      // 使用本地時間而不是 UTC 時間
+      const localTime = new Date();
+      const localISOString = new Date(
+        localTime.getTime() - (localTime.getTimezoneOffset() * 60000)
+      ).toISOString();
+      
+      const { error } = await supabase.from('feeding_records').insert([
+        {
+          pet_id: schedule.pet_id,
+          food_type: schedule.food_type,
+          amount: schedule.amount,
+          fed_at: localISOString, // 使用修正後的本地時間
+          scheduled: true,
+        },
+      ]);
+
+      if (error) throw error;
+      console.log('定時餵食記錄已儲存');
+      
+      // 重新載入餵食紀錄
+      fetchFeedingRecords();
+    } catch (error) {
+      console.error('Error recording scheduled feeding:', error);
+    }
+  };
+
+  // 啟動定時檢查
+  useEffect(() => {
+    console.log('啟動定時檢查，當前定時設定數量:', schedules.length);
+    
+    // 每分鐘檢查一次定時餵食
+    checkIntervalRef.current = setInterval(() => {
+      console.log('執行定時檢查...');
+      checkScheduledFeeding();
+    }, 60 * 1000);
+    
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
+    };
+  }, [schedules, activeSchedules]);
+
+  // 清理定時器
+  useEffect(() => {
+    return () => {
+      scheduleTimersRef.current.forEach(timer => clearTimeout(timer));
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
+    };
+  }, []);
 
   const fetchPets = async () => {
     try {
@@ -169,6 +360,7 @@ export default function FeedingRecordPage() {
       await Promise.all([
         fetchFeedingRecords(),
         fetchPetDetails(),
+        fetchSchedules(),
       ]);
       setIsRefreshing(false);
     };
@@ -265,6 +457,248 @@ export default function FeedingRecordPage() {
       setNutritionResult(null);
     }
   }, [selectedFood, formData.amount]);
+
+  // 修正時間顯示格式 - 處理不同類型的時間字串
+  const formatTime = (dateString: string | null | undefined) => {
+    try {
+      // 檢查輸入是否有效
+      if (!dateString) {
+        return '--:--:--';
+      }
+      
+      // 如果是時間字串格式 (HH:MM 或 HH:MM:SS)，直接返回時間部分
+      if (dateString.includes(':') && dateString.length <= 8) {
+        return dateString.substring(0, 5); // 只返回 HH:MM
+      }
+      
+      // 如果是日期字串，則進行時區轉換
+      const date = new Date(dateString);
+      
+      // 檢查是否為有效日期
+      if (isNaN(date.getTime())) {
+        console.error('無效的日期格式:', dateString);
+        return '--:--:--';
+      }
+      
+      // 直接減去 8 小時來修正時差
+      const correctedDate = new Date(date.getTime() - (8 * 60 * 60 * 1000));
+      
+      return correctedDate.toLocaleTimeString('zh-TW', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false // 使用 24 小時制
+      });
+    } catch (error) {
+      console.error('時間格式化錯誤:', error, '輸入值:', dateString);
+      return '--:--:--';
+    }
+  };
+
+  // 新增專門處理定時餵食時間顯示的函數
+  const formatScheduleTime = (timeString: string | null | undefined) => {
+    if (!timeString) {
+      return '--:--';
+    }
+    
+    // 定時餵食的時間格式是 HH:MM:SS，只顯示 HH:MM
+    return timeString.substring(0, 5);
+  };
+
+  // 格式化日期顯示
+  const formatDays = (days: string[]) => {
+    const dayMap: { [key: string]: string } = {
+      'monday': '週一',
+      'tuesday': '週二',
+      'wednesday': '週三',
+      'thursday': '週四',
+      'friday': '週五',
+      'saturday': '週六',
+      'sunday': '週日'
+    };
+    
+    if (days.length === 0) return '無';
+    if (days.length === 7) return '每天';
+    
+    return days.map(day => dayMap[day] || day).join('、');
+  };
+
+  // 新增時區測試函數
+  const testTimezone = () => {
+    const now = new Date();
+    console.log('時區測試:');
+    console.log('原始時間:', now);
+    console.log('UTC 時間:', now.toISOString());
+    console.log('本地時間:', now.toLocaleString('zh-TW'));
+    console.log('時區偏移:', now.getTimezoneOffset(), '分鐘');
+    
+    // 測試修正後的本地時間
+    const localISOString = new Date(
+      now.getTime() - (now.getTimezoneOffset() * 60000)
+    ).toISOString();
+    console.log('修正後的本地 ISO 時間:', localISOString);
+  };
+
+  // 簡化的定時檢查函數 - 使用 feed_until 指令
+  const checkScheduledFeeding = () => {
+    const now = new Date();
+    
+    // 修正時間格式：使用 24 小時制，包含秒，格式為 HH:MM:SS
+    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
+                    now.getMinutes().toString().padStart(2, '0') + ':' +
+                    now.getSeconds().toString().padStart(2, '0');
+    
+    // 修正日期格式：確保是英文小寫
+    const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    
+    // 生成今天的日期字串，用於檢查是否已執行
+    const todayDate = now.toDateString();
+    
+    schedules.forEach((schedule) => {
+      // 檢查時間是否匹配（包含秒）
+      const scheduleTime = schedule.time; // 使用完整的時間字串 (HH:MM:SS)
+      
+      if (schedule.enabled && 
+          scheduleTime === currentTime && 
+          schedule.days.includes(currentDay)) {
+        
+        // 檢查是否已經在今天執行過（使用日期字串避免重複執行）
+        const scheduleKey = `${schedule.id}-${todayDate}`;
+        const alreadyExecuted = activeSchedules.has(scheduleKey);
+        
+        if (!alreadyExecuted) {
+          // 立即標記為已執行，防止重複執行
+          setActiveSchedules(prev => {
+            const newSet = new Set(prev);
+            newSet.add(scheduleKey);
+            return newSet;
+          });
+          
+          // 先啟動餵食器
+          sendFeederCommand("start");
+          
+          // 等待1秒後發送餵食指令，使用 feed_until 並指定目標重量
+          setTimeout(() => {
+            sendFeederCommand(`feed_until ${schedule.amount}`);
+          }, 1000);
+          
+          // 每天凌晨清除標記，允許第二天執行
+          const tomorrow = new Date(now);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          tomorrow.setHours(0, 0, 0, 0);
+          const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+          
+          setTimeout(() => {
+            setActiveSchedules(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(scheduleKey);
+              return newSet;
+            });
+          }, timeUntilMidnight);
+        }
+      }
+    });
+  };
+
+  // 啟動定時檢查 - 改為每秒檢查一次，因為現在包含秒
+  useEffect(() => {
+    // 每秒檢查一次定時餵食，因為現在需要精確到秒
+    checkIntervalRef.current = setInterval(() => {
+      checkScheduledFeeding();
+    }, 1000); // 每秒檢查一次
+    
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
+    };
+  }, [schedules]);
+
+  // 移除所有調試函數，只保留必要的測試功能
+  const clearExecutionMarks = () => {
+    setActiveSchedules(new Set());
+  };
+
+  const testFeeding = () => {
+    sendFeederCommand("start");
+    
+    setTimeout(() => {
+      sendFeederCommand("feed");
+    }, 1000);
+  };
+
+  // 新增編輯狀態
+  const [editingSchedule, setEditingSchedule] = useState<any>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+
+  // 新增編輯函數
+  const handleEditSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingSchedule) return;
+    
+    // 自動將時間的秒位設為 00（如果沒有輸入秒）
+    let adjustedTime = scheduleData.time;
+    if (adjustedTime && adjustedTime.length === 5) {
+      adjustedTime = adjustedTime + ':00';
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('feeding_schedules')
+        .update({
+          time: adjustedTime,
+          food_type: scheduleData.food_type,
+          amount: parseFloat(scheduleData.amount),
+          days: scheduleData.days,
+          enabled: scheduleData.enabled,
+        })
+        .eq('id', editingSchedule.id);
+
+      if (error) throw error;
+
+      setScheduleData({
+        time: '',
+        food_type: '',
+        amount: '',
+        days: [],
+        enabled: true,
+      });
+      setEditingSchedule(null);
+      setShowEditForm(false);
+      fetchSchedules();
+      alert('定時餵食設定已更新');
+    } catch (error) {
+      console.error('Error updating schedule:', error);
+      alert('更新失敗，請重試');
+    }
+  };
+
+  // 新增開始編輯函數
+  const startEdit = (schedule: any) => {
+    setEditingSchedule(schedule);
+    setScheduleData({
+      time: schedule.time,
+      food_type: schedule.food_type,
+      amount: schedule.amount.toString(),
+      days: schedule.days,
+      enabled: schedule.enabled,
+    });
+    setShowEditForm(true);
+  };
+
+  // 新增取消編輯函數
+  const cancelEdit = () => {
+    setEditingSchedule(null);
+    setShowEditForm(false);
+    setScheduleData({
+      time: '',
+      food_type: '',
+      amount: '',
+      days: [],
+      enabled: true,
+    });
+  };
 
   if (pets.length === 0 && !selectedPet) {
     return (
@@ -445,7 +879,6 @@ export default function FeedingRecordPage() {
             <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("start")}>啟動餵食器</button>
             <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("stop")}>停止餵食器</button>
             <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("feed")}>執行一次餵食</button>
-            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("status")}>查詢狀態</button>
             <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("open_gate")}>開啟閘門</button>
             <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("close_gate")}>關閉閘門</button>
           </div>
@@ -484,7 +917,7 @@ export default function FeedingRecordPage() {
                     {records.map((record) => (
                       <tr key={record.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {new Date(record.fed_at).toLocaleTimeString('zh-TW')}
+                          {formatTime(record.fed_at)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {record.food_type === "default_food" ? (
@@ -566,7 +999,76 @@ export default function FeedingRecordPage() {
             )}
           </div>
         </div>
-      </div>
+
+        {/* 定時餵食設定區塊 */}
+        <div className="bg-white rounded-lg shadow mb-8 p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Timer className="w-5 h-5" />
+              定時餵食設定
+            </h2>
+            <button
+              onClick={() => setShowScheduleForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              新增定時設定
+            </button>
+          </div>
+
+          {schedules.length > 0 ? (
+            <div className="space-y-3">
+              {schedules.map((schedule) => (
+                <div key={schedule.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-4">
+                      <div className="text-lg font-medium">{formatScheduleTime(schedule.time)}</div>
+                      <div className="text-sm text-gray-600">
+                        {schedule.food_type} - {schedule.amount}g
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {formatDays(schedule.days)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleSchedule(schedule.id, !schedule.enabled)}
+                      className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
+                        schedule.enabled
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {schedule.enabled ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                      {schedule.enabled ? '啟用中' : '已停用'}
+                    </button>
+                    <button
+                      onClick={() => startEdit(schedule)}
+                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200 flex items-center gap-1"
+                    >
+                      <Settings className="w-3 h-3" />
+                      編輯
+                    </button>
+                    <button
+                      onClick={() => deleteSchedule(schedule.id)}
+                      className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200 flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      刪除
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Timer className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p>尚未設定定時餵食</p>
+              <p className="text-sm">點擊上方按鈕新增定時餵食設定</p>
+            </div>
+          )}
+        </div>
 
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -614,6 +1116,220 @@ export default function FeedingRecordPage() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
+                  className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  取消
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showScheduleForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">新增定時餵食設定</h2>
+            <form onSubmit={handleScheduleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">餵食時間</label>
+                <input
+                  type="time"
+                  step="1" // 啟用秒的輸入
+                  value={scheduleData.time.substring(0, 8)} // 顯示 HH:MM:SS
+                  onChange={handleTimeChange}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                  title="選擇餵食時間（包含秒）"
+                  aria-label="選擇餵食時間（包含秒）"
+                />
+                <p className="text-xs text-gray-500 mt-1">可以選擇精確到秒的時間</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">飼料品牌</label>
+                <select
+                  value={scheduleData.food_type}
+                  onChange={e => setScheduleData({ ...scheduleData, food_type: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                  title="選擇飼料品牌"
+                  aria-label="選擇飼料品牌"
+                >
+                  <option value="">請選擇飼料品牌</option>
+                  {foodList.map(food => (
+                    <option key={food.food_type} value={food.food_type}>{food.food_type}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">餵食量 (g)</label>
+                <input
+                  type="number"
+                  value={scheduleData.amount}
+                  onChange={e => setScheduleData({ ...scheduleData, amount: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="請輸入餵食量"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">重複日期</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'monday', label: '週一' },
+                    { key: 'tuesday', label: '週二' },
+                    { key: 'wednesday', label: '週三' },
+                    { key: 'thursday', label: '週四' },
+                    { key: 'friday', label: '週五' },
+                    { key: 'saturday', label: '週六' },
+                    { key: 'sunday', label: '週日' }
+                  ].map(({ key, label }) => (
+                    <label key={key} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={scheduleData.days.includes(key)}
+                        onChange={() => handleDayToggle(key)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="enabled"
+                  checked={scheduleData.enabled}
+                  onChange={e => setScheduleData({ ...scheduleData, enabled: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="enabled" className="ml-2 text-sm text-gray-700">
+                  立即啟用此設定
+                </label>
+              </div>
+              
+              <div className="flex gap-4 mt-6">
+                <button
+                  type="submit"
+                  className="flex-1 bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors"
+                >
+                  儲存設定
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleForm(false)}
+                  className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  取消
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">編輯定時餵食設定</h2>
+            <form onSubmit={handleEditSchedule} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">餵食時間</label>
+                <input
+                  type="time"
+                  step="1" // 啟用秒的輸入
+                  value={scheduleData.time.substring(0, 8)} // 顯示 HH:MM:SS
+                  onChange={handleTimeChange}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                  title="選擇餵食時間（包含秒）"
+                  aria-label="選擇餵食時間（包含秒）"
+                />
+                <p className="text-xs text-gray-500 mt-1">可以選擇精確到秒的時間</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">飼料品牌</label>
+                <select
+                  value={scheduleData.food_type}
+                  onChange={e => setScheduleData({ ...scheduleData, food_type: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                  title="選擇飼料品牌"
+                  aria-label="選擇飼料品牌"
+                >
+                  <option value="">請選擇飼料品牌</option>
+                  {foodList.map(food => (
+                    <option key={food.food_type} value={food.food_type}>{food.food_type}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">餵食量 (g)</label>
+                <input
+                  type="number"
+                  value={scheduleData.amount}
+                  onChange={e => setScheduleData({ ...scheduleData, amount: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="請輸入餵食量"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">重複日期</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'monday', label: '週一' },
+                    { key: 'tuesday', label: '週二' },
+                    { key: 'wednesday', label: '週三' },
+                    { key: 'thursday', label: '週四' },
+                    { key: 'friday', label: '週五' },
+                    { key: 'saturday', label: '週六' },
+                    { key: 'sunday', label: '週日' }
+                  ].map(({ key, label }) => (
+                    <label key={key} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={scheduleData.days.includes(key)}
+                        onChange={() => handleDayToggle(key)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="edit-enabled"
+                  checked={scheduleData.enabled}
+                  onChange={e => setScheduleData({ ...scheduleData, enabled: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="edit-enabled" className="ml-2 text-sm text-gray-700">
+                  啟用此設定
+                </label>
+              </div>
+              
+              <div className="flex gap-4 mt-6">
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  更新設定
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
                   className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   取消
@@ -715,6 +1431,7 @@ export default function FeedingRecordPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
