@@ -22,19 +22,22 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # 這裡的參數名稱與 Supabase 欄位名稱保持一致，但實際傳入的值是來自 MQTT 訊息的解析結果
 def store_feeding_record(timestamp, pet_id, amount, weight, laser_distance, power, food_type, calories):
     try:
-        # 直接使用傳入的參數來構建要插入的數據，這些參數已在 on_message 中處理過映射關係
+        # 如果 timestamp 是 None，使用當前本地時間
+        if timestamp is None:
+            from datetime import datetime
+            timestamp = datetime.now().isoformat()
+        
         data = {
             'fed_at': timestamp,
             'pet_id': pet_id,
-            'amount': amount,           # 本次餵食飼料重量 (來自 MQTT 的 'Weight' 欄位)
-            'weight': weight,           # 廚餘重量 (來自 MQTT 的 'height_waste' 欄位)
-            'laser_distance': laser_distance, # 測量飼料量的雷射距離 (來自 MQTT 的 'height_feed' 欄位)
+            'amount': amount,
+            'weight': weight,
+            'laser_distance': laser_distance,
             'power': power,
             'food_type': food_type,
             'calories': calories
         }
         
-        # 插入數據到 feeding_records 表
         response = supabase.table('feeding_records').insert(data).execute()
         print(f"餵食紀錄已儲存到 Supabase: {data}")
         

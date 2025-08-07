@@ -74,6 +74,10 @@ export default function FeedingRecordPage() {
   const MQTT_PASSWORD = "petmanager";
   const mqttClientRef = React.useRef<mqtt.MqttClient | null>(null);
 
+  // 餵食器狀態管理
+  const [feederStatus, setFeederStatus] = useState<'idle' | 'active'>('idle');
+  const [lastStatusUpdate, setLastStatusUpdate] = useState<Date | null>(null);
+
   // 定時器相關
   const scheduleTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -84,6 +88,43 @@ export default function FeedingRecordPage() {
       password: MQTT_PASSWORD,
     });
     mqttClientRef.current = client;
+
+    // 監聽餵食器狀態更新
+    client.on('connect', () => {
+      console.log('MQTT 已連線');
+      // 訂閱狀態更新主題
+      client.subscribe('pet/manager/topic/start');
+      client.subscribe('pet/manager/topic/stop');
+      client.subscribe('pet/manager/topic/feeding');
+      client.subscribe('pet/manager/topic/status');
+    });
+
+    client.on('message', (topic, message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        console.log('收到 MQTT 訊息:', topic, data);
+        
+        if (topic === 'pet/manager/topic/start') {
+          setFeederStatus('active');
+          setLastStatusUpdate(new Date());
+        } else if (topic === 'pet/manager/topic/stop') {
+          setFeederStatus('idle');
+          setLastStatusUpdate(new Date());
+        } else if (topic === 'pet/manager/topic/feeding') {
+          if (data.status === 'error') {
+            alert(`餵食器錯誤: ${data.message}`);
+          }
+        } else if (topic === 'pet/manager/topic/status') {
+          if (data.system_status) {
+            setFeederStatus(data.system_status);
+            setLastStatusUpdate(new Date());
+          }
+        }
+      } catch (error) {
+        console.error('MQTT 訊息解析錯誤:', error);
+      }
+    });
+
     return () => {
       client.end();
     };
@@ -96,6 +137,41 @@ export default function FeedingRecordPage() {
     } else {
       console.log("MQTT 尚未連線，請稍後再試。");
     }
+  };
+
+  // 檢查餵食器是否已啟動
+  const isFeederActive = () => {
+    return feederStatus === 'active';
+  };
+
+  // 處理餵食器啟動
+  const handleStartFeeder = () => {
+    if (isFeederActive()) {
+      alert("餵食器已經啟動中，無需重複啟動");
+      return;
+    }
+    alert("正在啟動餵食器...");
+    sendFeederCommand("start");
+  };
+
+  // 處理餵食器停止
+  const handleStopFeeder = () => {
+    if (!isFeederActive()) {
+      alert("餵食器已經停止，無需重複停止");
+      return;
+    }
+    alert("正在停止餵食器...");
+    sendFeederCommand("stop");
+  };
+
+  // 處理需要啟動狀態的功能
+  const handleActiveCommand = (cmd: string, actionName: string) => {
+    if (!isFeederActive()) {
+      alert(`餵食器未啟動，無法執行${actionName}。請先啟動餵食器。`);
+      return;
+    }
+    alert(`已發送${actionName}指令`);
+    sendFeederCommand(cmd);
   };
 
   // 定時餵食相關函數
@@ -375,6 +451,23 @@ export default function FeedingRecordPage() {
     return () => clearInterval(intervalId);
   }, [selectedPet, selectedDate, fetchFeedingRecords]);
 
+  // 定期檢查餵食器狀態
+  useEffect(() => {
+    const checkFeederStatus = () => {
+      if (mqttClientRef.current && mqttClientRef.current.connected) {
+        sendFeederCommand("status");
+      }
+    };
+
+    // 每30秒檢查一次餵食器狀態
+    const statusInterval = setInterval(checkFeederStatus, 30000);
+    
+    // 初始檢查
+    checkFeederStatus();
+
+    return () => clearInterval(statusInterval);
+  }, []);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -495,14 +588,16 @@ export default function FeedingRecordPage() {
     }
   };
 
-  // 新增專門處理定時餵食時間顯示的函數
+  // 修正時間顯示格式 - 確保正確顯示
   const formatScheduleTime = (timeString: string | null | undefined) => {
     if (!timeString) {
       return '--:--';
     }
     
     // 定時餵食的時間格式是 HH:MM:SS，只顯示 HH:MM
-    return timeString.substring(0, 5);
+    const timeOnly = timeString.substring(0, 5);
+    
+    return timeOnly;
   };
 
   // 格式化日期顯示
@@ -539,7 +634,7 @@ export default function FeedingRecordPage() {
     console.log('修正後的本地 ISO 時間:', localISOString);
   };
 
-  // 簡化的定時檢查函數 - 使用 feed_until 指令
+  // 簡化的定時檢查函數 - 移除複雜的時間轉換
   const checkScheduledFeeding = () => {
     const now = new Date();
     
@@ -554,51 +649,58 @@ export default function FeedingRecordPage() {
     // 生成今天的日期字串，用於檢查是否已執行
     const todayDate = now.toDateString();
     
+    // 簡化的調試日誌
+    console.log(`檢查時間: ${currentTime}, 日期: ${currentDay}`);
+    
     schedules.forEach((schedule) => {
-      // 檢查時間是否匹配（包含秒）
-      const scheduleTime = schedule.time; // 使用完整的時間字串 (HH:MM:SS)
+      // 直接使用設定的時間，不進行轉換
+      const scheduleTime = schedule.time;
+      
+      console.log(`設定時間: ${scheduleTime}, 當前時間: ${currentTime}, 匹配: ${scheduleTime === currentTime}`);
       
       if (schedule.enabled && 
           scheduleTime === currentTime && 
           schedule.days.includes(currentDay)) {
+      
+      // 檢查是否已經在今天執行過
+      const scheduleKey = `${schedule.id}-${todayDate}`;
+      const alreadyExecuted = activeSchedules.has(scheduleKey);
+      
+      if (!alreadyExecuted) {
+        console.log(`執行定時餵食: ${schedule.time} - ${schedule.food_type} - ${schedule.amount}g`);
         
-        // 檢查是否已經在今天執行過（使用日期字串避免重複執行）
-        const scheduleKey = `${schedule.id}-${todayDate}`;
-        const alreadyExecuted = activeSchedules.has(scheduleKey);
+        // 立即標記為已執行
+        setActiveSchedules(prev => {
+          const newSet = new Set(prev);
+          newSet.add(scheduleKey);
+          return newSet;
+        });
         
-        if (!alreadyExecuted) {
-          // 立即標記為已執行，防止重複執行
+        // 先啟動餵食器
+        sendFeederCommand("start");
+        
+        // 等待1秒後發送餵食指令
+        setTimeout(() => {
+          sendFeederCommand(`feed_until ${schedule.amount}`);
+        }, 1000);
+        
+        // 每天凌晨清除標記
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+        
+        setTimeout(() => {
           setActiveSchedules(prev => {
             const newSet = new Set(prev);
-            newSet.add(scheduleKey);
+            newSet.delete(scheduleKey);
             return newSet;
           });
-          
-          // 先啟動餵食器
-          sendFeederCommand("start");
-          
-          // 等待1秒後發送餵食指令，使用 feed_until 並指定目標重量
-          setTimeout(() => {
-            sendFeederCommand(`feed_until ${schedule.amount}`);
-          }, 1000);
-          
-          // 每天凌晨清除標記，允許第二天執行
-          const tomorrow = new Date(now);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          tomorrow.setHours(0, 0, 0, 0);
-          const timeUntilMidnight = tomorrow.getTime() - now.getTime();
-          
-          setTimeout(() => {
-            setActiveSchedules(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(scheduleKey);
-              return newSet;
-            });
-          }, timeUntilMidnight);
-        }
+        }, timeUntilMidnight);
       }
+    }
     });
-  };
+  }
 
   // 啟動定時檢查 - 改為每秒檢查一次，因為現在包含秒
   useEffect(() => {
@@ -874,21 +976,110 @@ export default function FeedingRecordPage() {
 
         {/* 餵食器控制區塊 */}
         <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 mb-8">
-          <h3 className="text-lg font-bold mb-2">餵食器控制</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold">餵食器控制</h3>
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${isFeederActive() ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-sm font-medium">
+                {isFeederActive() ? '已啟動' : '未啟動'}
+              </span>
+              {lastStatusUpdate && (
+                <span className="text-xs text-gray-500">
+                  (更新於 {lastStatusUpdate.toLocaleTimeString('zh-TW')})
+                </span>
+              )}
+            </div>
+          </div>
+          
           <div className="flex flex-wrap gap-2 mb-2">
-            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("start")}>啟動餵食器</button>
-            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("stop")}>停止餵食器</button>
-            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("feed")}>執行一次餵食</button>
-            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("open_gate")}>開啟閘門</button>
-            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => sendFeederCommand("close_gate")}>關閉閘門</button>
+            <button 
+              className={`px-4 py-2 text-white rounded transition-colors ${
+                isFeederActive() 
+                  ? 'bg-green-500 hover:bg-green-600' 
+                  : 'bg-blue-500 hover:bg-blue-600'
+              }`} 
+              onClick={handleStartFeeder}
+            >
+              {isFeederActive() ? '已啟動' : '啟動餵食器'}
+            </button>
+            <button 
+              className={`px-4 py-2 text-white rounded transition-colors ${
+                !isFeederActive() 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-red-500 hover:bg-red-600'
+              }`} 
+              onClick={handleStopFeeder}
+              disabled={!isFeederActive()}
+            >
+              停止餵食器
+            </button>
+            <button 
+              className={`px-4 py-2 text-white rounded transition-colors ${
+                !isFeederActive() 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-500 hover:bg-blue-600'
+              }`} 
+              onClick={() => handleActiveCommand("feed", "執行一次餵食")}
+              disabled={!isFeederActive()}
+            >
+              執行一次餵食
+            </button>
+            <button 
+              className={`px-4 py-2 text-white rounded transition-colors ${
+                !isFeederActive() 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-500 hover:bg-blue-600'
+              }`} 
+              onClick={() => handleActiveCommand("open_gate", "開啟閘門")}
+              disabled={!isFeederActive()}
+            >
+              開啟閘門
+            </button>
+            <button 
+              className={`px-4 py-2 text-white rounded transition-colors ${
+                !isFeederActive() 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-500 hover:bg-blue-600'
+              }`} 
+              onClick={() => handleActiveCommand("close_gate", "關閉閘門")}
+              disabled={!isFeederActive()}
+            >
+              關閉閘門
+            </button>
           </div>
           <div className="flex items-center gap-2">
-            <input id="feedUntilWeight" type="number" placeholder="目標重量 (g)" className="border rounded px-2 py-1 w-32" />
-            <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={() => {
-              const weight = (document.getElementById("feedUntilWeight") as HTMLInputElement).value;
-              if (weight) sendFeederCommand(`feed_until ${weight}`);
-              else alert("請輸入目標重量");
-            }}>持續餵食直到達到目標重量</button>
+            <input 
+              id="feedUntilWeight" 
+              type="number" 
+              placeholder="目標重量 (g)" 
+              className={`border rounded px-2 py-1 w-32 ${
+                !isFeederActive() ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
+              disabled={!isFeederActive()}
+            />
+            <button 
+              className={`px-4 py-2 text-white rounded transition-colors ${
+                !isFeederActive() 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-500 hover:bg-blue-600'
+              }`} 
+              onClick={() => {
+                if (!isFeederActive()) {
+                  alert("餵食器未啟動，無法執行持續餵食。請先啟動餵食器。");
+                  return;
+                }
+                const weight = (document.getElementById("feedUntilWeight") as HTMLInputElement).value;
+                if (weight) {
+                  alert(`已發送持續餵食指令，目標重量：${weight}g`);
+                  sendFeederCommand(`feed_until ${weight}`);
+                } else {
+                  alert("請輸入目標重量");
+                }
+              }}
+              disabled={!isFeederActive()}
+            >
+              持續餵食直到達到目標重量
+            </button>
           </div>
         </div>
 
