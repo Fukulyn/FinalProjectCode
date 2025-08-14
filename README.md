@@ -3,7 +3,6 @@
 專題程式碼匯集區
 
 ***
-[APP/Web前端網址](https://7jjl14w0-4173.asse.devtunnels.ms/)
 
 [系統文件連結](https://tku365-my.sharepoint.com/:w:/g/personal/411630725_o365_tku_edu_tw/EU9uQ7A28XdEiYWP-r8aVM0BgwJzU5LwzOV1TqAJYcktDA?e=hboSH0)
 
