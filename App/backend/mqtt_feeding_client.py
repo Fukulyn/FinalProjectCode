@@ -1,22 +1,24 @@
+import os
+import json
+from dotenv import load_dotenv
+from dotenv import load_dotenv
 import paho.mqtt.client as mqtt
 from datetime import datetime
 from supabase import create_client
-import json
 from paho.mqtt.enums import CallbackAPIVersion
 
-# MQTT 配置
-MQTT_BROKER_URL = "broker.emqx.io"
-MQTT_PORT = 1883
-MQTT_TOPIC = "pet/manager/topic/feeding"  # 餵食器數據讀取及記錄
-MQTT_USERNAME = "petmanager"  # MQTT 用戶名
-MQTT_PASSWORD = "petmanager"  # MQTT 密碼
+load_dotenv()  # 加載 .env 文件中的環境變量
 
-# Supabase 配置
-SUPABASE_URL = "https://hkjclbdisriyqsvcpmnp.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhramNsYmRpc3JpeXFzdmNwbW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NTM1NzQsImV4cCI6MjA1NTUyOTU3NH0.kcKKU2u_FioHElJBTcV6uDVJjOL6nWDlZ0hz1r26_AQ"
+MQTT_BROKER_URL = os.getenv("MQTT_BROKER_URL", "broker.emqx.io")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+MQTT_TOPIC = os.getenv("MQTT_TOPIC_FEEDING", "pet/manager/topic/feeding")
+MQTT_USERNAME = os.getenv("MQTT_USERNAME")  # 可留空
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")  # 可留空
 
-# 初始化 Supabase 客户端
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 # 存储喂食记录到 Supabase
 # 這裡的參數名稱與 Supabase 欄位名稱保持一致，但實際傳入的值是來自 MQTT 訊息的解析結果

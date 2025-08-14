@@ -4,7 +4,7 @@ BROKER = "broker.emqx.io"
 PORT = 1883
 USERNAME = "petmanager"
 PASSWORD = "petmanager"
-TOPIC = "feeder/command"  # 必須與後端一致
+TOPIC = "feeder/command"  # 餵食器控制指令主題
 
 COMMANDS = {
     "start": "啟動餵食器",

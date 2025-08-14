@@ -1,24 +1,25 @@
+import os
+import json
+from dotenv import load_dotenv
 import paho.mqtt.client as mqtt
 from datetime import datetime
 from supabase import create_client
 import json
 from paho.mqtt.enums import CallbackAPIVersion
 
-# MQTT 配置
-MQTT_BROKER_URL = "broker.emqx.io"
-MQTT_PORT = 1883
-MQTT_TOPIC = "pet/manager/topic/collar" # 专门用于宠物项圈数据的主题
-MQTT_USERNAME = "petmanager"  # MQTT 用戶名
-MQTT_PASSWORD = "petmanager"  # MQTT 密碼
+load_dotenv()  # 加載 .env 文件中的環境變量
 
-# Supabase 配置
-SUPABASE_URL = "https://hkjclbdisriyqsvcpmnp.supabase.co"
-# 使用 service_role key 来绕过 RLS
-SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhramNsYmRpc3JpeXFzdmNwbW5wIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczOTk1MzU3NCwiZXhwIjoyMDU1NTI5NTc0fQ.CVRbG_UEoesN6n0Ofz1TPx66mOKqK09pvDu5vFkg0as"  # 替换为你的 service_role key
+MQTT_BROKER_URL = os.getenv("MQTT_BROKER_URL", "broker.emqx.io")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+MQTT_TOPIC = os.getenv("MQTT_TOPIC_COLLAR", "pet/manager/topic/collar")
+MQTT_USERNAME = os.getenv("MQTT_USERNAME")  # 可留空
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")  # 可留空
 
-# 初始化 Supabase 客户端，使用 service role key
-supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+# 只有伺服器程式才可用 Service Role Key；切記不要放到前端或裝置端
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 def store_health_record(payload):
     try:
         # 解析接收到的 JSON 数据
