@@ -1,10 +1,18 @@
+import os
 import paho.mqtt.client as mqtt
+from dotenv import load_dotenv
 
-BROKER = "broker.emqx.io"
-PORT = 1883
-USERNAME = "petmanager"
-PASSWORD = "petmanager"
-TOPIC = "feeder/command"  # 餵食器控制指令主題
+# 載入 .env
+load_dotenv()
+
+# MQTT 設定
+MQTT_BROKER_URL = os.getenv("MQTT_BROKER_URL", "broker.emqx.io")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "petmanager")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "petmanager")
+
+# 主題統一命名
+MQTT_TOPIC_COMMAND = os.getenv("MQTT_TOPIC_COMMAND", "feeder/command")
 
 COMMANDS = {
     "start": "啟動餵食器",
@@ -23,10 +31,10 @@ def print_command_menu():
 
 def send_command(command):
     client = mqtt.Client()
-    client.username_pw_set(USERNAME, PASSWORD)
-    client.connect(BROKER, PORT, 60)
+    client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    client.connect(MQTT_BROKER_URL, MQTT_PORT, 60)
     client.loop_start()
-    client.publish(TOPIC, command)
+    client.publish(MQTT_TOPIC_COMMAND, command)  
     print(f"已傳送指令: {command}")
     client.loop_stop()
     client.disconnect()
