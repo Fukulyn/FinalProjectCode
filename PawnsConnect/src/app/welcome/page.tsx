@@ -1,24 +1,49 @@
-
 "use client";
 
 import { AuthForm } from '@/components/auth/AuthForm';
 import { PawPrint, Heart, Search } from 'lucide-react';
 import Image from 'next/image';
 import { usePawsConnect } from '@/context/PawsConnectContext';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function WelcomePage() {
     const { user, isLoadingAuth } = usePawsConnect();
     const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // 簡化重設檢查邏輯
+    const [shouldReset, setShouldReset] = useState(false);
+    const [hasCheckedReset, setHasCheckedReset] = useState(false);
 
     useEffect(() => {
-        if (!isLoadingAuth && user) {
+        if (hasCheckedReset) return; // 避免重複檢查
+        
+        const queryCode = searchParams?.get('code');
+        const typeParam = searchParams?.get('type');
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        const isRecoveryHash = /type=recovery|access_token=/.test(hash);
+        
+        const needsReset = !!queryCode || typeParam === 'recovery' || isRecoveryHash;
+        
+        if (needsReset) {
+            setShouldReset(true);
+            const next = queryCode ? `/reset-password?code=${encodeURIComponent(queryCode)}` : '/reset-password';
+            router.replace(next);
+        } else {
+            setHasCheckedReset(true);
+        }
+    }, [searchParams, router, hasCheckedReset]);
+
+    // 處理已登入用戶的重導向
+    useEffect(() => {
+        if (!isLoadingAuth && user && hasCheckedReset && !shouldReset) {
             router.replace('/');
         }
-    }, [user, isLoadingAuth, router]);
+    }, [user, isLoadingAuth, router, shouldReset, hasCheckedReset]);
 
-    if (isLoadingAuth || user) {
+    // 只在真正載入時顯示載入畫面
+    if (isLoadingAuth || shouldReset || !hasCheckedReset) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
           <PawPrint className="w-12 h-12 text-primary animate-spin" />
@@ -27,8 +52,19 @@ export default function WelcomePage() {
       );
     }
 
+    // 如果已登入但還沒被重導向，顯示載入畫面
+    if (user) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+                <PawPrint className="w-12 h-12 text-primary animate-spin" />
+                <p className="mt-4 text-lg text-muted-foreground">正在載入中...</p>
+            </div>
+        );
+    }
+
     return (
         <div className="w-full space-y-12">
+
             <section className="text-center pt-8 md:pt-16">
                 <div className="max-w-3xl mx-auto">
                     <div className="flex justify-center items-center gap-4 mb-4">
@@ -79,7 +115,13 @@ export default function WelcomePage() {
                         </div>
                     </div>
                     <div className="relative aspect-video rounded-lg overflow-hidden shadow-xl">
-                        <Image src="https://placehold.co/600x400.png" alt="Happy dog with owner" layout="fill" objectFit="cover" data-ai-hint="dog person" />
+                        <Image 
+                            src="https://doghealth.east.org.tw/wp-content/uploads/2022/01/750X1125-3.jpg" 
+                            alt="Happy dog with owner" 
+                            fill
+                            className="object-cover object-center"
+                            data-ai-hint="dog person" 
+                        />
                     </div>
                 </div>
 

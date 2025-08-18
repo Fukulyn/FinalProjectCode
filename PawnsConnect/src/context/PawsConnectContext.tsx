@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Dog, Profile, UserRole, HealthRecord, FeedingSchedule, VaccinationRecord } from '@/types';
@@ -45,7 +44,16 @@ const mapDbDogToDogType = (dbViewDog: DbDog): Dog => {
   
   const healthRecordsData = (dbViewDog.health_records as unknown) as HealthRecord | null;
   const feedingScheduleData = (dbViewDog.feeding_schedule as unknown) as FeedingSchedule | null;
-  const vaccinationRecordsData = (dbViewDog.vaccination_records ? (Array.isArray(dbViewDog.vaccination_records) ? dbViewDog.vaccination_records : []) : []) as VaccinationRecord[];
+
+  // Normalize vaccination records coming from JSON aggregate
+  const vaccinationRecordsRaw = (dbViewDog.vaccination_records as unknown) as any[] | null;
+  const vaccinationRecords: VaccinationRecord[] = Array.isArray(vaccinationRecordsRaw)
+    ? vaccinationRecordsRaw.map((vr: any) => ({
+        vaccineName: typeof vr?.vaccine_name === 'string' ? vr.vaccine_name : (typeof vr?.vaccineName === 'string' ? vr.vaccineName : '未指定疫苗'),
+        dateAdministered: typeof vr?.date === 'string' ? vr.date : (typeof vr?.dateAdministered === 'string' ? vr.dateAdministered : ''),
+        nextDueDate: typeof vr?.next_due_date === 'string' ? vr.next_due_date : (typeof vr?.nextDueDate === 'string' ? vr.nextDueDate : undefined),
+      }))
+    : [];
 
   const meaningfulConditions = healthRecordsData?.conditions?.filter(
     c => c && c.trim() && c.trim().toLowerCase() !== 'none' && c.trim() !== '無'
@@ -70,11 +78,7 @@ const mapDbDogToDogType = (dbViewDog: DbDog): Dog => {
       portionSize: feedingScheduleData?.portionSize || defaultFeedingSchedule.portionSize,
       notes: feedingScheduleData?.notes || defaultFeedingSchedule.notes,
     },
-    vaccinationRecords: vaccinationRecordsData.map(vr => ({
-      vaccineName: vr.vaccineName || '未指定疫苗',
-      dateAdministered: vr.dateAdministered || '',
-      nextDueDate: vr.nextDueDate || undefined,
-    })),
+    vaccinationRecords,
     liveStreamUrl: dbViewDog.live_stream_url || undefined,
     status: dbViewDog.status === 'Available' || dbViewDog.status === 'Pending' || dbViewDog.status === 'Adopted' ? dbViewDog.status : 'Available',
     location: dbViewDog.location || '未知地點',
@@ -179,22 +183,28 @@ export const PawsConnectProvider = ({ children }: { children: React.ReactNode })
         const currentUser = newSession?.user ?? null;
         const previousUserId = user?.id;
 
-        if (currentUser?.id !== previousUserId) {
+        // 只有在用戶真正改變時才設置載入狀態
+        const userChanged = currentUser?.id !== previousUserId;
+        
+        if (userChanged) {
           setIsLoadingAuth(true);
         }
         
         setSession(newSession);
         setUser(currentUser);
         
-        if (currentUser) {
-            await fetchProfileAndSet(currentUser);
-        } else {
-            setProfile(null);
-            resetDogState();
-        }
-
-        if (currentUser?.id !== previousUserId) {
-           setIsLoadingAuth(false);
+        try {
+          if (currentUser) {
+              await fetchProfileAndSet(currentUser);
+          } else {
+              setProfile(null);
+              resetDogState();
+          }
+        } catch (error) {
+          console.error('Error handling auth state change:', error);
+        } finally {
+          // 確保載入狀態總是被重置
+          setIsLoadingAuth(false);
         }
       }
     );
@@ -234,8 +244,8 @@ export const PawsConnectProvider = ({ children }: { children: React.ReactNode })
             throw likedDogsError;
         }
         const userLikedDbDogs = (likedDogsData || [])
-            .map(likeRecord => likeRecord.dogs_for_adoption_view)
-            .filter((dog): dog is DbDog => dog !== null && typeof dog === 'object');
+            .map((likeRecord: any) => likeRecord.dogs_for_adoption_view as DbDog | null)
+            .filter((dog): dog is DbDog => !!dog);
         const userLikedDogs = userLikedDbDogs.map(mapDbDogToDogType);
         setLikedDogs(userLikedDogs);
 
@@ -487,62 +497,64 @@ export const PawsConnectProvider = ({ children }: { children: React.ReactNode })
   };
 
   const sendPasswordResetEmail = async (email: string): Promise<{ error: string | null }> => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/`, 
-    });
-    if (error) {
-      console.error('Error sending password reset email:', error);
-      return { error: error.message };
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error("Error sending password reset email:", error);
+      return { error: "無法發送密碼重設郵件，請稍後再試。" };
     }
-    return { error: null };
   };
 
   const updateUserEmail = async (newEmail: string): Promise<{ error: string | null }> => {
-    const { error } = await supabase.auth.updateUser({ email: newEmail });
-    if (error) {
-      console.error('Error updating user email:', error);
-      return { error: error.message };
+    if (!user) {
+      return { error: "使用者未登入。" };
     }
-    return { error: null };
-  }
+    try {
+      const { error } = await supabase.auth.updateUser({ email: newEmail });
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error("Error updating user email:", error);
+      return { error: "無法更新郵件地址，請稍後再試。" };
+    }
+  };
 
+  const value = {
+    dogsToSwipe,
+    likedDogs,
+    seenDogIds,
+    likeDog,
+    passDog,
+    getDogById,
+    isLoadingDogs,
 
-  return (
-    <PawsConnectContext.Provider value={{ 
-        dogsToSwipe, 
-        likedDogs, 
-        seenDogIds,
-        likeDog, 
-        passDog, 
-        getDogById,
-        isLoadingDogs,
-        user,
-        session,
-        profile,
-        isLoadingAuth,
-        isUpdatingProfile,
-        login,
-        signUp,
-        logout,
-        updateProfile,
-        deleteAccount,
-        sendPasswordResetEmail,
-        updateUserEmail
-    }}>
-      {children}
-    </PawsConnectContext.Provider>
-  );
+    user,
+    profile,
+    session,
+    isLoadingAuth,
+    isUpdatingProfile,
+    login,
+    signUp,
+    logout,
+    updateProfile,
+    deleteAccount,
+    sendPasswordResetEmail,
+    updateUserEmail,
+  };
+
+  return <PawsConnectContext.Provider value={value}>{children}</PawsConnectContext.Provider>;
 };
 
 export const usePawsConnect = () => {
   const context = React.useContext(PawsConnectContext);
   if (context === undefined) {
-    throw new Error('usePawsConnect 必須在 PawsConnectProvider 內使用');
+    throw new Error('usePawsConnect must be used within a PawsConnectProvider');
   }
   return context;
 };
 
-    
-    
 
-    
+
+

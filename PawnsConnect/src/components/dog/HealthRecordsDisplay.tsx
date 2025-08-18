@@ -63,7 +63,12 @@ export const HealthRecordsDisplay = ({ dog }: HealthRecordsDisplayProps) => {
         <CardContent className="p-6 space-y-3">
           <p><strong>食物種類：</strong> {dog.feedingSchedule?.foodType || '未指定'}</p>
           <p><strong>每日次數：</strong> {dog.feedingSchedule?.timesPerDay ?? '未指定'}</p>
-          <p><strong>份量：</strong> {dog.feedingSchedule?.portionSize || '未指定'}</p>
+          <p><strong>份量：</strong> {(() => {
+            const portionSize = dog.feedingSchedule?.portionSize;
+            if (!portionSize || portionSize === '未指定') return '未指定';
+            const numericValue = parseFloat(portionSize);
+            return isNaN(numericValue) ? portionSize : numericValue.toFixed(2);
+          })()}</p>
           <p><strong>備註：</strong> {dog.feedingSchedule?.notes || '無'}</p>
         </CardContent>
       </Card>

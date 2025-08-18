@@ -144,16 +144,6 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>通知設定</CardTitle>
-          <CardDescription>管理您希望如何收到通知。</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">此功能即將推出。</p>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
           <CardTitle>帳戶管理</CardTitle>
            <CardDescription>管理您的帳戶資料。</CardDescription>
         </CardHeader>

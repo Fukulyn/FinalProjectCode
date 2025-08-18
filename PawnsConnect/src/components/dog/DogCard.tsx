@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Dog } from '@/types';
@@ -6,7 +5,7 @@ import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Heart, XCircle, Info, MapPin, Bone } from 'lucide-react';
+import { Heart, XCircle, Info, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DogCardProps {
@@ -28,17 +27,18 @@ export const DogCard = ({ dog, onLike, onPass, onDetails, isTopCard, animationCl
         animationClass, 
         isTopCard ? "opacity-100 transform scale-100" : "opacity-0 transform scale-90 absolute -z-10"
       )}
-      style={{ aspectRatio: '3/4.5' }}
+      // 移除 style={{ aspectRatio: '3/4.5' }}，讓卡片高度根據內容動態調整
       aria-label={`關於 ${dog.name} 的資料卡`}
     >
       <CardHeader className="p-0 relative">
-        <div className="aspect-w-1 aspect-h-1 w-full">
+        {/* 移除 aspect-w-1 aspect-h-1，讓圖片容器的高度根據圖片大小調整 */}
+        <div className="w-full relative" style={{ height: '400px' }}>
           <Image
-            src={dog.photos[0]}
+            // 新增邏輯，如果圖片不存在則顯示備用圖片
+            src={dog.photos && dog.photos.length > 0 ? dog.photos[0] : '/placeholder.jpg'}
             alt={dog.name}
-            width={400}
-            height={400}
-            className="object-cover w-full h-full"
+            fill
+            className="object-cover"
             priority={isTopCard}
             data-ai-hint="dog portrait"
           />

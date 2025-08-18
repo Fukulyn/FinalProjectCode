@@ -2,12 +2,12 @@
 "use client";
 
 import type { Dog } from '@/types';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { HealthRecordsDisplay } from './HealthRecordsDisplay';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Heart, X, Video, AlertTriangle } from 'lucide-react';
+import { MapPin, Heart, Video, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import Link from 'next/link';
@@ -77,11 +77,6 @@ export const DogDetailsModal = ({ dog, isOpen, onClose }: DogDetailsModalProps) 
               <DialogTitle className="text-3xl font-headline text-primary">{dog.name}</DialogTitle>
               <DialogDescription className="text-lg">{dog.breed} - {dog.age} 歲 - {translateGender(dog.gender)}</DialogDescription>
             </div>
-            <DialogClose asChild>
-              <Button variant="ghost" size="icon" onClick={onClose} aria-label="關閉對話框">
-                <X className="h-6 w-6" />
-              </Button>
-            </DialogClose>
           </div>
         </DialogHeader>
 
