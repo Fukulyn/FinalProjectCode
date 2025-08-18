@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Home, Syringe, Plus, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Pet, VaccineRecord } from '../types';
@@ -82,7 +82,6 @@ export default function VaccineRecordPage() {
     date: '',
     next_due_date: '',
   });
-  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPets();
@@ -137,17 +136,135 @@ export default function VaccineRecordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 驗證必填欄位
+    if (!selectedPet) {
+      alert('請先選擇寵物');
+      return;
+    }
+    
+    if (!formData.vaccine_name || !formData.date || !formData.next_due_date) {
+      alert('請填寫所有必填欄位');
+      return;
+    }
+    
+    console.log('Form submission started:', {
+      selectedPet,
+      formData,
+      petsCount: pets.length
+    });
+    
     try {
-      const { error } = await supabase.from('vaccine_records').insert([
+      // 檢查認證狀態
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('用戶未登入，請重新登入');
+        return;
+      }
+      
+      // 檢查選擇的寵物是否屬於當前用戶
+      console.log('Verifying pet ownership:', {
+        selectedPet,
+        userId: user.id,
+        availablePets: pets.map(p => ({ id: p.id, name: p.name }))
+      });
+
+      const { data: petData, error: petError } = await supabase
+        .from('pets')
+        .select('id, user_id, name')
+        .eq('id', selectedPet)
+        .eq('user_id', user.id);
+      
+      if (petError) {
+        console.error('Pet verification error:', petError);
+        alert('查詢寵物時發生錯誤：' + petError.message);
+        return;
+      }
+      
+      console.log('Pet verification result:', { petData, petError });
+      
+      if (!petData || petData.length === 0) {
+        // 嘗試查詢該寵物是否存在但屬於其他用戶
+        const { data: allPetData } = await supabase
+          .from('pets')
+          .select('id, user_id, name')
+          .eq('id', selectedPet);
+          
+        console.error('Pet not found or not owned by user:', {
+          selectedPet,
+          userId: user.id,
+          petData,
+          allPetData,
+          availablePets: pets
+        });
+        
+        if (allPetData && allPetData.length > 0) {
+          alert(`寵物存在但不屬於當前用戶。寵物所有者ID: ${allPetData[0].user_id}`);
+        } else {
+          alert('所選寵物不存在。請重新選擇寵物。');
+        }
+        return;
+      }
+      
+      const pet = petData[0];
+      
+      console.log('User authenticated:', user.id);
+      console.log('Pet verified:', pet);
+      console.log('Submitting vaccine record:', {
+        pet_id: selectedPet,
+        vaccine_name: formData.vaccine_name,
+        date: formData.date,
+        next_due_date: formData.next_due_date,
+      });
+
+      const { data, error } = await supabase.from('vaccine_records').insert([
         {
           pet_id: selectedPet,
           vaccine_name: formData.vaccine_name,
           date: formData.date,
           next_due_date: formData.next_due_date,
         },
-      ]);
+      ]).select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error details:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
+        console.error('Error hint:', error.hint);
+        
+        // 提供更友善的錯誤訊息
+        let userMessage = '新增疫苗紀錄失敗: ';
+        if (error.code === 'PGRST301') {
+          userMessage += '沒有權限執行此操作';
+        } else if (error.message.includes('foreign key')) {
+          userMessage += '所選寵物不存在';
+        } else if (error.message.includes('not null')) {
+          userMessage += '請填寫所有必填欄位';
+        } else {
+          userMessage += error.message || '未知錯誤';
+        }
+        
+        alert(userMessage);
+        throw error;
+      }
+
+      console.log('Vaccine record added successfully:', data);
+
+      // 發送單一郵件提醒（只針對新增的疫苗記錄）
+      try {
+        if (user.email) {
+          await sendEmailReminder(
+            user.email, 
+            formData.vaccine_name,
+            pet.name,
+            formData.next_due_date
+          );
+          console.log('疫苗提醒郵件已發送');
+        }
+      } catch (emailError) {
+        console.log('郵件發送失敗，但疫苗記錄已成功新增:', emailError);
+      }
 
       setFormData({
         vaccine_name: '',
@@ -156,9 +273,29 @@ export default function VaccineRecordPage() {
       });
       setShowForm(false);
       fetchVaccineRecords();
-      navigate('/vaccine-record');
+      alert('疫苗記錄新增成功！');
     } catch (error) {
       console.error('Error adding vaccine record:', error);
+      
+      // 詳細的錯誤處理
+      let errorMessage = '新增疫苗記錄失敗';
+      
+      if (error && typeof error === 'object') {
+        if ('message' in error) {
+          errorMessage += `: ${error.message}`;
+        }
+        if ('details' in error) {
+          console.error('Error details:', error.details);
+        }
+        if ('hint' in error) {
+          console.error('Error hint:', error.hint);
+        }
+        if ('code' in error) {
+          console.error('Error code:', error.code);
+        }
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -199,36 +336,37 @@ export default function VaccineRecordPage() {
   const checkVaccineReminders = async (pets: Pet[]) => {
     for (const pet of pets) {
       try {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('email')
-          .eq('id', pet.user_id)
-          .single();
-
-        if (userError) {
-          console.error('獲取使用者電子郵件時出錯:', {
-            error: userError,
+        // 直接從當前認證用戶獲取電子郵件
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
+          console.error('獲取當前用戶資訊失敗:', userError);
+          continue;
+        }
+        
+        // 檢查這個寵物是否屬於當前用戶
+        if (pet.user_id !== user.id) {
+          console.warn('跳過不屬於當前用戶的寵物:', pet.id);
+          continue;
+        }
+        
+        if (!user.email) {
+          console.error('當前用戶沒有電子郵件地址:', {
             petId: pet.id,
             userId: pet.user_id
           });
           continue;
         }
-
-        if (!userData || !userData.email) {
-          console.error('找不到使用者電子郵件:', {
-            petId: pet.id,
-            userId: pet.user_id
-          });
-          continue;
-        }
-
+        
         const birthDate = new Date(pet.birth_date);
         const ageInWeeks = Math.floor((new Date().getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
         
+        // 只記錄應該接種的疫苗，但不發送郵件（避免重複發送）
         vaccineData.forEach(vaccine => {
           const scheduleWeeks = getVaccineScheduleInWeeks(vaccine.schedule);
           if (ageInWeeks >= scheduleWeeks) {
-            sendEmailReminder(userData.email, vaccine.name);
+            console.log(`寵物 ${pet.name} 應該接種 ${vaccine.name}（年齡: ${ageInWeeks} 週）`);
+            // 移除自動發送郵件，只在手動新增記錄時發送
           }
         });
       } catch (error) {
@@ -241,12 +379,17 @@ export default function VaccineRecordPage() {
     }
   };
 
-  const sendEmailReminder = async (email: string, vaccineName: string) => {
+  const sendEmailReminder = async (email: string, vaccineName: string, petName?: string, dueDate?: string) => {
     try {
       const res = await fetch('http://localhost:3001/api/send-vaccine-reminder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, vaccine_name: vaccineName }),
+        body: JSON.stringify({ 
+          email, 
+          vaccine_name: vaccineName,
+          pet_name: petName || '您的寵物',
+          due_date: dueDate || ''
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '寄信失敗');
@@ -289,15 +432,22 @@ export default function VaccineRecordPage() {
               <select
                 id="pet-select"
                 value={selectedPet}
-                onChange={(e) => setSelectedPet(e.target.value)}
+                onChange={(e) => {
+                  console.log('Pet selection changed:', e.target.value);
+                  setSelectedPet(e.target.value);
+                }}
                 className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 aria-label="選擇寵物"
               >
-                {pets.map((pet) => (
-                  <option key={pet.id} value={pet.id}>
-                    {pet.name}
-                  </option>
-                ))}
+                {pets.length === 0 ? (
+                  <option value="">沒有可用的寵物</option>
+                ) : (
+                  pets.map((pet) => (
+                    <option key={pet.id} value={pet.id}>
+                      {pet.name}
+                    </option>
+                  ))
+                )}
               </select>
               <button
                 onClick={() => setShowForm(true)}

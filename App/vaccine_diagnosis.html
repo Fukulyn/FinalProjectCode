@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>疫苗記錄診斷工具</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .result-item {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐾 PawsConnect 疫苗記錄診斷工具</h1>
+        <p>這個工具可以幫助診斷疫苗記錄新增失敗的問題</p>
+
+        <div class="section info">
+            <h3>診斷步驟</h3>
+            <button onclick="checkAuth()">1. 檢查認證狀態</button>
+            <button onclick="checkPets()">2. 檢查寵物列表</button>
+            <button onclick="checkVaccineTable()">3. 檢查疫苗表結構</button>
+            <button onclick="testVaccineInsert()">4. 測試疫苗插入</button>
+            <button onclick="runFullDiagnosis()">🚀 執行完整診斷</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // 初始化 Supabase (請確認這些設定正確)
+        const supabaseUrl = 'https://hkjclbdisriyqsvcpmnp.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhramNsYmRpc3JpeXFzdmNwbW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc2MTg4OTcsImV4cCI6MjA1MzE5NDg5N30.Lw-cXKQhe8IAo8LIli38nUlJ_gLKKIU6O7irJr8Cris';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function addResult(title, content, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultItem = document.createElement('div');
+            resultItem.className = `result-item section ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            resultItem.innerHTML = `
+                <h4>[${timestamp}] ${title}</h4>
+                <div>${content}</div>
+            `;
+            
+            resultsDiv.appendChild(resultItem);
+            resultItem.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function checkAuth() {
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                
+                if (error) {
+                    addResult('❌ 認證檢查失敗', `錯誤: ${error.message}`, 'error');
+                    return null;
+                }
+                
+                if (user) {
+                    addResult('✅ 用戶已認證', `
+                        <strong>用戶 ID:</strong> ${user.id}<br>
+                        <strong>電子郵件:</strong> ${user.email}<br>
+                        <strong>認證時間:</strong> ${new Date(user.created_at).toLocaleString()}
+                    `, 'success');
+                    return user;
+                } else {
+                    addResult('❌ 用戶未登入', '請先登入系統', 'error');
+                    return null;
+                }
+            } catch (error) {
+                addResult('❌ 認證檢查錯誤', `${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function checkPets() {
+            const user = await checkAuth();
+            if (!user) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('pets')
+                    .select('*')
+                    .eq('user_id', user.id);
+
+                if (error) {
+                    addResult('❌ 寵物查詢失敗', `錯誤: ${error.message}`, 'error');
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    const petsList = data.map(pet => `
+                        <div style="margin: 5px 0; padding: 5px; background: rgba(0,123,255,0.1); border-radius: 3px;">
+                            <strong>${pet.name}</strong> (ID: ${pet.id})
+                        </div>
+                    `).join('');
+                    
+                    addResult('✅ 寵物列表', `
+                        找到 ${data.length} 隻寵物:<br>
+                        ${petsList}
+                    `, 'success');
+                } else {
+                    addResult('⚠️ 沒有寵物', '請先新增寵物資料', 'error');
+                }
+            } catch (error) {
+                addResult('❌ 寵物查詢錯誤', `${error.message}`, 'error');
+            }
+        }
+
+        async function checkVaccineTable() {
+            try {
+                // 嘗試查詢疫苗記錄表結構
+                const { data, error } = await supabase
+                    .from('vaccine_records')
+                    .select('*')
+                    .limit(1);
+
+                if (error) {
+                    addResult('❌ 疫苗表查詢失敗', `
+                        錯誤: ${error.message}<br>
+                        <strong>錯誤代碼:</strong> ${error.code}<br>
+                        <strong>詳細資訊:</strong> ${error.details || '無'}
+                    `, 'error');
+                    return;
+                }
+
+                addResult('✅ 疫苗表可存取', `
+                    疫苗記錄表存在且可以查詢<br>
+                    <small>查詢結果: ${data ? data.length : 0} 筆記錄</small>
+                `, 'success');
+
+            } catch (error) {
+                addResult('❌ 疫苗表檢查錯誤', `${error.message}`, 'error');
+            }
+        }
+
+        async function testVaccineInsert() {
+            const user = await checkAuth();
+            if (!user) return;
+
+            // 先獲取用戶的寵物
+            const { data: pets, error: petError } = await supabase
+                .from('pets')
+                .select('id, name')
+                .eq('user_id', user.id)
+                .limit(1);
+
+            if (petError || !pets || pets.length === 0) {
+                addResult('❌ 測試插入失敗', '沒有可用的寵物進行測試', 'error');
+                return;
+            }
+
+            const testPet = pets[0];
+            const testData = {
+                pet_id: testPet.id,
+                vaccine_name: '測試疫苗 - ' + new Date().getTime(),
+                date: new Date().toISOString().split('T')[0],
+                next_due_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            };
+
+            addResult('🧪 開始測試插入', `
+                <strong>測試資料:</strong><br>
+                <pre>${JSON.stringify(testData, null, 2)}</pre>
+            `);
+
+            try {
+                const { data, error } = await supabase
+                    .from('vaccine_records')
+                    .insert([testData])
+                    .select();
+
+                if (error) {
+                    addResult('❌ 插入測試失敗', `
+                        <strong>錯誤訊息:</strong> ${error.message}<br>
+                        <strong>錯誤代碼:</strong> ${error.code}<br>
+                        <strong>詳細資訊:</strong> ${error.details || '無'}<br>
+                        <strong>提示:</strong> ${error.hint || '無'}
+                    `, 'error');
+                    
+                    // 提供解決建議
+                    let suggestion = '';
+                    if (error.code === 'PGRST301') {
+                        suggestion = '權限問題: 檢查 RLS 政策設定';
+                    } else if (error.message.includes('foreign key')) {
+                        suggestion = '外鍵約束: 寵物 ID 無效';
+                    } else if (error.message.includes('not null')) {
+                        suggestion = '必填欄位: 檢查所有必填欄位';
+                    }
+                    
+                    if (suggestion) {
+                        addResult('💡 解決建議', suggestion, 'info');
+                    }
+                } else {
+                    addResult('✅ 插入測試成功', `
+                        疫苗記錄已成功新增!<br>
+                        <strong>記錄 ID:</strong> ${data[0].id}<br>
+                        <small>注意: 這是測試記錄，可以手動刪除</small>
+                    `, 'success');
+                    
+                    // 清理測試數據
+                    setTimeout(async () => {
+                        try {
+                            await supabase
+                                .from('vaccine_records')
+                                .delete()
+                                .eq('id', data[0].id);
+                            addResult('🗑️ 測試數據已清理', '測試記錄已自動刪除', 'info');
+                        } catch (cleanupError) {
+                            addResult('⚠️ 清理警告', '無法自動刪除測試記錄，請手動清理', 'info');
+                        }
+                    }, 3000);
+                }
+            } catch (error) {
+                addResult('❌ 插入測試異常', `${error.message}`, 'error');
+            }
+        }
+
+        async function runFullDiagnosis() {
+            // 清空結果
+            document.getElementById('results').innerHTML = '';
+            
+            addResult('🚀 開始完整診斷', '執行所有診斷步驟...', 'info');
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await checkAuth();
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await checkPets();
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await checkVaccineTable();
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testVaccineInsert();
+            
+            addResult('🏁 診斷完成', '所有診斷步驟已執行完畢', 'success');
+        }
+
+        // 頁面載入時顯示說明
+        window.onload = function() {
+            addResult('📋 診斷工具已載入', `
+                點擊上方按鈕開始診斷疫苗記錄問題<br>
+                <small>建議先執行「完整診斷」獲得全面的檢查結果</small>
+            `);
+        };
+    </script>
+</body>
+</html>

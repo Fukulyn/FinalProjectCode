@@ -45,11 +45,12 @@ export default function Login() {
     setSuccess('');
     try {
       await resetPassword(email);
-      setSuccess('重設密碼連結已寄出，請檢查您的信箱');
+      setSuccess('重設密碼連結已寄出，請檢查您的信箱（包含垃圾郵件資料夾）。連結將在 24 小時內有效。');
       setTimeout(() => {
         setShowForgotPassword(false);
         setSuccess('');
-      }, 3000);
+        setEmail(''); // 清空郵件欄位
+      }, 5000);
     } catch (err) {
       setError(err instanceof Error ? err.message : '發生錯誤');
     }

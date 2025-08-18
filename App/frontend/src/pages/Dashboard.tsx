@@ -68,6 +68,13 @@ export default function Dashboard() {
       link: '/vaccines',
       color: 'bg-purple-500',
     },
+    {
+      title: '疫苗提醒設定',
+      icon: <Bell className="w-6 h-6" />,
+      description: '設定疫苗到期提醒',
+      link: '/vaccine-reminder-settings',
+      color: 'bg-yellow-500',
+    },
   ];
 
   return (
