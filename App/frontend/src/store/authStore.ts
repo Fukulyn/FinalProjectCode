@@ -10,6 +10,7 @@ interface AuthState {
   signOut: () => Promise<void>;
   checkAuth: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -73,8 +74,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   resetPassword: async (email: string) => {
+    // 優先使用環境變數，否則使用當前網站網址
+    const redirectUrl = import.meta.env.VITE_RESET_PASSWORD_URL || 
+                       `${window.location.origin}/reset-password`;
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://hkjclbdisriyqsvcpmnp.supabase.co/auth/v1/verify',
+      redirectTo: redirectUrl,
+    });
+    if (error) throw error;
+  },
+
+  updatePassword: async (password: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: password,
     });
     if (error) throw error;
   },
