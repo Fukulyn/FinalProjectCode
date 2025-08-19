@@ -68,7 +68,7 @@ export default function FeedingRecordPage() {
   const location = useLocation();
 
   // MQTT 相關
-  const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
+  const MQTT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
   const MQTT_TOPIC = "feeder/command";
   const MQTT_USERNAME = "petmanager";
   const MQTT_PASSWORD = "petmanager";

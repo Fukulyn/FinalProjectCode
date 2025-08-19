@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # MQTT 設定
-MQTT_BROKER_URL = os.getenv("MQTT_BROKER_URL", "broker.emqx.io")
+MQTT_BROKER_URL = os.getenv("MQTT_BROKER_URL")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USERNAME = os.getenv("MQTT_USERNAME", "petmanager")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "petmanager")

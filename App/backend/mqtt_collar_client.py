@@ -9,12 +9,11 @@ from paho.mqtt.enums import CallbackAPIVersion
 
 load_dotenv()  # 加載 .env 文件中的環境變量
 
-MQTT_BROKER_URL = os.getenv("MQTT_BROKER_URL", "broker.emqx.io")
+MQTT_BROKER_URL = os.getenv("MQTT_BROKER_URL")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC_COLLAR", "pet/manager/topic/collar")
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")  # 可留空
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")  # 可留空
-
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 # 只有伺服器程式才可用 Service Role Key；切記不要放到前端或裝置端
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -45,7 +44,7 @@ def store_health_record(payload):
     except Exception as e:
         print(f"存储健康记录时出错: {e}")
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print("已成功连接到 MQTT Broker!")
         client.subscribe(MQTT_TOPIC)
@@ -63,7 +62,7 @@ def on_message(client, userdata, msg):
         print(f"处理消息时出错: {e}")
 
 def main():
-    client = mqtt.Client(client_id="health_records_client", callback_api_version=CallbackAPIVersion.VERSION1)
+    client = mqtt.Client(client_id="health_records_client", callback_api_version=CallbackAPIVersion.VERSION2)
     client.on_connect = on_connect
     client.on_message = on_message
     

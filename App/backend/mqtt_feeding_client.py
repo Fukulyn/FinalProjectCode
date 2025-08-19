@@ -9,16 +9,16 @@ from paho.mqtt.enums import CallbackAPIVersion
 
 load_dotenv()  # 加載 .env 文件中的環境變量
 
-MQTT_BROKER_URL = os.getenv("MQTT_BROKER_URL", "broker.emqx.io")
+MQTT_BROKER_URL = os.getenv("MQTT_BROKER_URL", "broker.hivemq.com")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC_FEEDING", "pet/manager/topic/feeding")
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")  # 可留空
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")  # 可留空
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 # 存储喂食记录到 Supabase
 # 這裡的參數名稱與 Supabase 欄位名稱保持一致，但實際傳入的值是來自 MQTT 訊息的解析結果
@@ -47,7 +47,7 @@ def store_feeding_record(timestamp, pet_id, amount, weight, laser_distance, powe
         print(f"儲存餵食紀錄時出錯: {e}")
 
 # MQTT 回调函数
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print("已成功連接到 MQTT Broker!")
         client.subscribe(MQTT_TOPIC)
@@ -108,7 +108,7 @@ def on_message(client, userdata, msg):
 
 def main():
     # 创建 MQTT 客户端实例
-    client = mqtt.Client(client_id="feeding_records_client", callback_api_version=CallbackAPIVersion.VERSION1)
+    client = mqtt.Client(client_id="feeding_records_client", callback_api_version=CallbackAPIVersion.VERSION2)
     
     # 设置回调函数
     client.on_connect = on_connect
