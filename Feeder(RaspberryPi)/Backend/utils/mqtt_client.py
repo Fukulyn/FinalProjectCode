@@ -1,7 +1,7 @@
 import paho.mqtt.client as mqtt
 from controllers.feeder_controller import handle_mqtt_message
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc, properties=None):
     print("[MQTT] 已連線")
     client.subscribe("feeder/command")
 
@@ -17,6 +17,6 @@ def init_mqtt():
     client.on_connect = on_connect
     client.on_message = on_message
 
-    client.connect("broker.emqx.io", 1883, 60)  # 改這裡
+    client.connect("broker.hivemq.com", 1883, 60)  # 改這裡
 
     return client
