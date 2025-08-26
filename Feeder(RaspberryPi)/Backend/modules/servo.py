@@ -6,8 +6,8 @@ import RPi.GPIO as GPIO
 SERVO_FEED_PIN    = 16       # 餵食馬達 GPIO 腳位
 SERVO_WASTE_PIN   = 6       # 廚餘閘門 GPIO 腳位
 SERVO_FREQUENCY   = 50      # MG90S 建議 50Hz
-FIXED_DUTY        = 10     # 餵食用固定 DutyCycle
-FIXED_DUTY_2      = 2
+FIXED_DUTY        = 2     # 餵食用固定 DutyCycle
+FIXED_DUTY_2      = 12
 ESTIMATED_GRAM    = 10    # 假設每次餵這樣的克數（可自訂）
 
 # PWM 物件
@@ -38,12 +38,13 @@ def feed():
     返回估算餵食克數。
     """
     print(f"[餵食中] DutyCycle: {FIXED_DUTY}")
+    pwm_feed.ChangeDutyCycle(0)
     pwm_feed.ChangeDutyCycle(FIXED_DUTY)
-    time.sleep(1)
+    time.sleep(2)
+    pwm_feed.ChangeDutyCycle(0)
     time.sleep(0.5)
     pwm_feed.ChangeDutyCycle(FIXED_DUTY_2)
-    time.sleep(1)
-    time.sleep(0.5)
+    time.sleep(2)
     pwm_feed.ChangeDutyCycle(0)
     print(f"[完成] 餵食 {ESTIMATED_GRAM} g @ {datetime.now().isoformat()}")
     return ESTIMATED_GRAM
@@ -66,10 +67,12 @@ def feed_until_weight(target_grams, max_loops=20):
 
         pwm_feed.ChangeDutyCycle(FIXED_DUTY)
         time.sleep(3)
+        pwm_feed.ChangeDutyCycle(0)
+        time.sleep(0.5)
         pwm_feed.ChangeDutyCycle(FIXED_DUTY_2)
         time.sleep(3)
         pwm_feed.ChangeDutyCycle(0)
-        time.sleep(2)
+        time.sleep(1)
 
         loop += 1
 
@@ -79,11 +82,11 @@ def feed_until_weight(target_grams, max_loops=20):
 def open_waste_gate():
     print("[閘門] 開啟廚餘閘門")
     pwm_waste.ChangeDutyCycle(2)  # 開門位置
-    time.sleep(1)
+    time.sleep(0.5)
     pwm_waste.ChangeDutyCycle(0)
 
 def close_waste_gate():
     print("[閘門] 關閉廚餘閘門")
-    pwm_waste.ChangeDutyCycle(9)  # 關門位置
-    time.sleep(1)
+    pwm_waste.ChangeDutyCycle(12)  # 關門位置
+    time.sleep(0.5)
     pwm_waste.ChangeDutyCycle(0)
