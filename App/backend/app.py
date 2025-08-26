@@ -25,18 +25,8 @@ SMTP_USERNAME = os.getenv('SMTP_USERNAME', '')  # 您的 Gmail 地址
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')  # 應用程式密碼
 FROM_EMAIL = os.getenv('FROM_EMAIL', SMTP_USERNAME)
 
-# 測試能否連上 Supabase 5432 port
-host = "db.hkjclbdisriyqsvcpmnp.supabase.co"
-port = 5432
-try:
-    s = socket.create_connection((host, port), timeout=10)
-    print("可以連到 Supabase 5432 port")
-    s.close()
-except Exception as e:
-    print("無法連到 Supabase 5432 port：", e)
-
 # 使用 Supabase URI 連線格式
-DATABASE_URL = "postgresql://postgres:LaRLgZWac1t3NHFh@db.hkjclbdisriyqsvcpmnp.supabase.co:5432/postgres?sslmode=require"
+DATABASE_URL = "postgresql://postgres.hkjclbdisriyqsvcpmnp:LaRLgZWac1t3NHFh@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
 try:
     conn = psycopg2.connect(DATABASE_URL)
     print("資料庫連線成功")

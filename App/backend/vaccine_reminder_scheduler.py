@@ -14,7 +14,7 @@ import time
 import threading
 
 # 資料庫連線設定
-DATABASE_URL = "postgresql://postgres:LaRLgZWac1t3NHFh@db.hkjclbdisriyqsvcpmnp.supabase.co:5432/postgres?sslmode=require"
+DATABASE_URL = "postgresql://postgres.hkjclbdisriyqsvcpmnp:LaRLgZWac1t3NHFh@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
 
 # API 端點設定
 WEBPUSH_API_URL = "https://7jjl14w0-3001.asse.devtunnels.ms/api/send-webpush"

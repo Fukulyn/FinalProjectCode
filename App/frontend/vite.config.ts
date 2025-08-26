@@ -8,7 +8,7 @@ export default defineConfig({
     exclude: ["lucide-react"],
   },
   server: {
-    port: 5173, // 你想要的 port
-    strictPort: true, // 如果被佔用就報錯，不會自動改
+    port: 5173, 
+    strictPort: true,       
   },
 });
