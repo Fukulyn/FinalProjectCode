@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 # 載入環境變數
 load_dotenv()
 
-DATABASE_URL = "postgresql://postgres:LaRLgZWac1t3NHFh@db.hkjclbdisriyqsvcpmnp.supabase.co:5432/postgres?sslmode=require"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def check_database_structure():
     """檢查資料庫結構"""

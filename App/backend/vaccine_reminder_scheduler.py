@@ -14,11 +14,11 @@ import time
 import threading
 
 # 資料庫連線設定
-DATABASE_URL = "postgresql://postgres.hkjclbdisriyqsvcpmnp:LaRLgZWac1t3NHFh@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # API 端點設定
-WEBPUSH_API_URL = "https://7jjl14w0-3001.asse.devtunnels.ms/api/send-webpush"
-EMAIL_API_URL = "https://7jjl14w0-3001.asse.devtunnels.ms/api/send-vaccine-reminder"
+WEBPUSH_API_URL = os.getenv("WEBPUSH_API_URL")
+EMAIL_API_URL = os.getenv("EMAIL_API_URL")
 
 def get_database_connection():
     """建立資料庫連線"""

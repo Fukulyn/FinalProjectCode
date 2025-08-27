@@ -7,4 +7,5 @@ os.chdir(os.path.dirname(__file__))
 # 使用絕對路徑呼叫三個 Python 腳本
 subprocess.Popen(["python", "mqtt_collar_client.py"])
 subprocess.Popen(["python", "mqtt_feeding_client.py"])
-subprocess.Popen(["python", "app.py"])
+# subprocess.Popen(["python", "app.py"])
+# subprocess.Popen(["python", "reminder_mailer.py"])

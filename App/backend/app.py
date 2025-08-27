@@ -26,7 +26,7 @@ SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')  # 應用程式密碼
 FROM_EMAIL = os.getenv('FROM_EMAIL', SMTP_USERNAME)
 
 # 使用 Supabase URI 連線格式
-DATABASE_URL = "postgresql://postgres.hkjclbdisriyqsvcpmnp:LaRLgZWac1t3NHFh@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+DATABASE_URL = os.getenv("DATABASE_URL")
 try:
     conn = psycopg2.connect(DATABASE_URL)
     print("資料庫連線成功")
@@ -35,9 +35,9 @@ except Exception as e:
     raise
 
 # VAPID 設定
-VAPID_PUBLIC_KEY = "BPkjF5Q8CJx9B4i5rC_0INNb1w66HWZSw4TEd-laFk_OrmWvOirz24LuhJYUx1DoXRHhGY6NFSCDGEHfwLdZnGY"
-VAPID_PRIVATE_KEY = "GXJHwmJpMzUbqh5LDvfO0vruc63Y4sTVHkgPcyWT0lE"
-VAPID_CLAIMS = {"sub": "mailto:your@email.com"}
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY")
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY")
+VAPID_CLAIMS = {"sub": os.getenv("VAPID_CLAIMS_SUB")}
 
 @app.route('/api/save-subscription', methods=['POST', 'OPTIONS'])
 def save_subscription():
