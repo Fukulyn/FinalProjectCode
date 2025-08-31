@@ -37,12 +37,17 @@ except Exception as e:
 
 # 使用 Supabase URI 連線格式
 DATABASE_URL = "postgresql://postgres:LaRLgZWac1t3NHFh@db.hkjclbdisriyqsvcpmnp.supabase.co:5432/postgres?sslmode=require"
+conn = None
+SUPABASE_AVAILABLE = False
+
 try:
     conn = psycopg2.connect(DATABASE_URL)
     print("資料庫連線成功")
+    SUPABASE_AVAILABLE = True
 except Exception as e:
     print("資料庫連線失敗：", e)
-    raise
+    print("⚠️  將在離線模式運行 - 部分功能將無法使用")
+    SUPABASE_AVAILABLE = False
 
 # VAPID 設定
 VAPID_PUBLIC_KEY = "BPkjF5Q8CJx9B4i5rC_0INNb1w66HWZSw4TEd-laFk_OrmWvOirz24LuhJYUx1DoXRHhGY6NFSCDGEHfwLdZnGY"
@@ -282,13 +287,16 @@ PawsConnect 團隊
 def health_check():
     """健康檢查端點"""
     return jsonify({
-        'status': 'healthy',
+        'status': 'healthy' if SUPABASE_AVAILABLE else 'limited',
         'timestamp': str(datetime.now()),
         'version': '1.0.0',
         'services': {
-            'database': 'connected',
-            'email': 'disabled' if os.getenv('SKIP_EMAIL', 'true').lower() == 'true' else 'enabled'
-        }
+            'database': 'connected' if SUPABASE_AVAILABLE else 'offline',
+            'email': 'disabled' if os.getenv('SKIP_EMAIL', 'false').lower() == 'true' else 'enabled',
+            'network': 'connected' if SUPABASE_AVAILABLE else 'limited'
+        },
+        'mode': 'online' if SUPABASE_AVAILABLE else 'offline',
+        'message': 'All services operational' if SUPABASE_AVAILABLE else 'Running in offline mode - limited functionality'
     })
 
 if __name__ == '__main__':
