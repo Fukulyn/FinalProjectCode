@@ -8,7 +8,7 @@
 
 [簡報連結(中文)](https://tku365-my.sharepoint.com/:p:/g/personal/411630188_o365_tku_edu_tw/ERSFCLRTJwpJjMPHn1ojLKsBUCVhHpslqPGx5OwtaVQM3Q?e=WNAtyx)
 
-[簡報連結(英文)]([簡報連結](https://tku365-my.sharepoint.com/:p:/g/personal/411630188_o365_tku_edu_tw/ERSFCLRTJwpJjMPHn1ojLKsBUCVhHpslqPGx5OwtaVQM3Q?e=WNAtyx))
+[簡報連結(英文)](https://tku365-my.sharepoint.com/:p:/g/personal/411630188_o365_tku_edu_tw/ERSFCLRTJwpJjMPHn1ojLKsBUCVhHpslqPGx5OwtaVQM3Q?e=WNAtyx)
 
 [會議記錄連結](https://www.notion.so/36a319d8309c49ac8abe713efc28bf51)
 
