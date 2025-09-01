@@ -1239,7 +1239,7 @@ export default function FeedingRecordPage() {
                         飼料剩餘量
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        廚餘重量
+                        廚餘量高度
                       </th>
                     </tr>
                   </thead>
@@ -1311,7 +1311,7 @@ export default function FeedingRecordPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {record.weight !== undefined
-                            ? `${record.weight} g`
+                            ? `${record.weight} mm`
                             : "--"}
                         </td>
                       </tr>
