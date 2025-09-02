@@ -13,6 +13,8 @@ export interface Pet {
   birth_date: string;
   weight: number;
   created_at: string;
+  photos?: string[];
+  location?: string;
 }
 
 export interface HealthRecord {
@@ -66,6 +68,59 @@ export interface VideoStream {
 
 // Add Bluetooth types
 declare global {
+  interface BluetoothRemoteGATTServer {
+    device: BluetoothDevice;
+    connected: boolean;
+    connect(): Promise<BluetoothRemoteGATTServer>;
+    disconnect(): void;
+    getPrimaryService(service: BluetoothServiceUUID): Promise<BluetoothRemoteGATTService>;
+    getPrimaryServices(service?: BluetoothServiceUUID): Promise<BluetoothRemoteGATTService[]>;
+  }
+
+  interface BluetoothDevice {
+    id: string;
+    name?: string;
+    gatt?: BluetoothRemoteGATTServer;
+    addEventListener(type: string, listener: EventListener): void;
+    removeEventListener(type: string, listener: EventListener): void;
+  }
+
+  interface BluetoothRemoteGATTService {
+    device: BluetoothDevice;
+    uuid: string;
+    isPrimary: boolean;
+    getCharacteristic(characteristic: BluetoothCharacteristicUUID): Promise<BluetoothRemoteGATTCharacteristic>;
+    getCharacteristics(characteristic?: BluetoothCharacteristicUUID): Promise<BluetoothRemoteGATTCharacteristic[]>;
+  }
+
+  interface BluetoothRemoteGATTCharacteristic {
+    service: BluetoothRemoteGATTService;
+    uuid: string;
+    properties: BluetoothCharacteristicProperties;
+    value?: DataView;
+    readValue(): Promise<DataView>;
+    writeValue(value: BufferSource): Promise<void>;
+    startNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
+    stopNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
+    addEventListener(type: string, listener: EventListener): void;
+    removeEventListener(type: string, listener: EventListener): void;
+  }
+
+  interface BluetoothCharacteristicProperties {
+    broadcast: boolean;
+    read: boolean;
+    writeWithoutResponse: boolean;
+    write: boolean;
+    notify: boolean;
+    indicate: boolean;
+    authenticatedSignedWrites: boolean;
+    reliableWrite: boolean;
+    writableAuxiliaries: boolean;
+  }
+
+  type BluetoothServiceUUID = number | string;
+  type BluetoothCharacteristicUUID = number | string;
+
   interface Navigator {
     bluetooth: {
       requestDevice(options: {
@@ -75,13 +130,7 @@ declare global {
           namePrefix?: string;
         }>;
         optionalServices?: string[];
-      }): Promise<{
-        id: string;
-        name?: string;
-        gatt?: {
-          connect(): Promise<any>;
-        };
-      }>;
+      }): Promise<BluetoothDevice>;
     };
   }
 }
