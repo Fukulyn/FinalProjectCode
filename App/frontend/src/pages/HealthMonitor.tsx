@@ -40,6 +40,7 @@ export default function HealthMonitor() {
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [stepsValue, setStepsValue] = useState<number | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const location = useLocation();
 
   const getHealthStatus = (type: string, value: number) => {
@@ -70,6 +71,11 @@ export default function HealthMonitor() {
   const temperatureStatus = latestRecord ? getHealthStatus('temperature', latestRecord.temperature) : 'normal';
   const heartRateStatus = latestRecord ? getHealthStatus('heart_rate', latestRecord.heart_rate) : 'normal';
   const oxygenStatus = latestRecord ? getHealthStatus('oxygen_level', latestRecord.oxygen_level) : 'normal';
+
+  // 檢查是否有異常狀態
+  const hasAbnormalStatus = () => {
+    return temperatureStatus !== 'normal' || heartRateStatus !== 'normal' || oxygenStatus !== 'normal';
+  };
 
   const fetchHealthRecords = useCallback(async () => {
     if (!selectedPet) return;
@@ -135,7 +141,7 @@ export default function HealthMonitor() {
     }
   }, [selectedPet]);
 
-  const fetchPets = async () => {
+  const fetchPets = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('pets')
@@ -156,11 +162,20 @@ export default function HealthMonitor() {
     } catch (error) {
       console.error('Error fetching pets:', error);
     }
-  };
+  }, [location.search]);
 
   useEffect(() => {
     fetchPets();
-  }, [location.search]);
+  }, [fetchPets, location.search]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (!selectedPet) return;
@@ -235,66 +250,195 @@ export default function HealthMonitor() {
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     interaction: {
       mode: 'index' as const,
       intersect: false,
     },
     plugins: {
       legend: {
-        position: 'top' as const,
+        display: false, // 隱藏圖例，因為每個圖表只有一條線
       },
       title: {
         display: false,
       },
     },
     scales: {
+      x: {
+        ticks: {
+          maxRotation: isMobile ? 45 : 0,
+          font: {
+            size: isMobile ? 9 : 11
+          }
+        }
+      },
       y: {
         type: 'linear' as const,
         display: true,
-        position: 'left' as const,
-      },
-      y1: {
-        type: 'linear' as const,
-        display: true,
-        position: 'right' as const,
-        grid: {
-          drawOnChartArea: false,
-        },
+        ticks: {
+          font: {
+            size: isMobile ? 9 : 11
+          }
+        }
       },
     },
+    elements: {
+      point: {
+        radius: isMobile ? 1.5 : 2
+      }
+    }
   };
 
-  const chartData = {
-    labels: records.map(record =>
-      new Date(record.recorded_at).toLocaleString('zh-TW', {
-        month: 'numeric',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: 'numeric'
+  // 體溫專用圖表配置
+  const temperatureChartOptions = {
+    ...chartOptions,
+    scales: {
+      ...chartOptions.scales,
+      y: {
+        ...chartOptions.scales.y,
+        min: 26,
+        max: 44,
+        ticks: {
+          ...chartOptions.scales.y.ticks,
+          stepSize: 2
+        }
+      }
+    }
+  };
+
+  // 心率專用圖表配置
+  const heartRateChartOptions = {
+    ...chartOptions,
+    scales: {
+      ...chartOptions.scales,
+      y: {
+        ...chartOptions.scales.y,
+        min: 70,
+        max: 200,
+        ticks: {
+          ...chartOptions.scales.y.ticks,
+          stepSize: 10
+        }
+      }
+    }
+  };
+
+  // 血氧專用圖表配置
+  const oxygenChartOptions = {
+    ...chartOptions,
+    scales: {
+      ...chartOptions.scales,
+      y: {
+        ...chartOptions.scales.y,
+        min: 60,
+        max: 100,
+        ticks: {
+          ...chartOptions.scales.y.ticks,
+          stepSize: 5
+        }
+      }
+    }
+  };
+
+  // 體溫圖表數據
+  const temperatureChartData = {
+    labels: records.map(data => 
+      new Date(data.recorded_at).toLocaleTimeString('zh-TW', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        month: 'short',
+        day: 'numeric'
       })
     ),
     datasets: [
       {
+        data: records.map(data => data.temperature),
+        borderColor: 'rgb(239, 68, 68)',
+        backgroundColor: 'rgba(239, 68, 68, 0.8)',
+        borderWidth: 0,
+        showLine: false,
+        fill: false,
+        pointBackgroundColor: 'rgb(239, 68, 68)',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 8,
         label: '體溫 (°C)',
-        data: records.map(record => record.temperature),
-        borderColor: 'rgb(255, 99, 132)',
-        backgroundColor: 'rgba(255, 99, 132, 0.5)',
-        yAxisID: 'y',
       },
+    ],
+  };  // 心率圖表數據
+  const heartRateChartData = {
+    labels: records.map(record => {
+      const date = new Date(record.recorded_at);
+      if (isMobile) {
+        return date.toLocaleString('zh-TW', {
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        });
+      } else {
+        return date.toLocaleString('zh-TW', {
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric'
+        });
+      }
+    }),
+    datasets: [
       {
         label: '心率 (BPM)',
         data: records.map(record => record.heart_rate),
         borderColor: 'rgb(53, 162, 235)',
-        backgroundColor: 'rgba(53, 162, 235, 0.5)',
-        yAxisID: 'y1',
-      },
+        backgroundColor: 'rgba(53, 162, 235, 0.8)',
+        borderWidth: 0,
+        showLine: false,
+        fill: false,
+        pointBackgroundColor: 'rgb(53, 162, 235)',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 8,
+      }
+    ],
+  };
+
+  // 血氧圖表數據
+  const oxygenChartData = {
+    labels: records.map(record => {
+      const date = new Date(record.recorded_at);
+      if (isMobile) {
+        return date.toLocaleString('zh-TW', {
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        });
+      } else {
+        return date.toLocaleString('zh-TW', {
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric'
+        });
+      }
+    }),
+    datasets: [
       {
         label: '血氧 (%)',
         data: records.map(record => record.oxygen_level),
         borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.5)',
-        yAxisID: 'y',
-      },
+        backgroundColor: 'rgba(75, 192, 192, 0.8)',
+        borderWidth: 0,
+        showLine: false,
+        fill: false,
+        pointBackgroundColor: 'rgb(75, 192, 192)',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 8,
+      }
     ],
   };
 
@@ -362,6 +506,26 @@ export default function HealthMonitor() {
             </span>
           </div>
         </div>
+
+        {/* 異常狀態警告 */}
+        {latestRecord && hasAbnormalStatus() && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Activity className="w-5 h-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  感測異常警告
+                </h3>
+                <p className="mt-2 text-sm text-red-700">
+                  檢測到異常數值，請確認項圈貼合狀況和動物狀態，目前感測可能不良。
+                  建議檢查項圈是否正確佩戴，並觀察寵物的實際狀況。
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
@@ -447,16 +611,16 @@ export default function HealthMonitor() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-4">
             <div className="flex items-center gap-3">
               <LineChart className="w-6 h-6 text-blue-500" />
               <h2 className="text-lg font-semibold">健康趨勢圖</h2>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 overflow-x-auto">
               <button
                 onClick={() => setTimeRange('week')}
-                className={`px-3 py-1 text-sm rounded-md ${
+                className={`px-3 py-1 text-sm rounded-md whitespace-nowrap ${
                   timeRange === 'week' 
                     ? 'bg-blue-500 text-white' 
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -466,7 +630,7 @@ export default function HealthMonitor() {
               </button>
               <button
                 onClick={() => setTimeRange('month')}
-                className={`px-3 py-1 text-sm rounded-md ${
+                className={`px-3 py-1 text-sm rounded-md whitespace-nowrap ${
                   timeRange === 'month' 
                     ? 'bg-blue-500 text-white' 
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -476,7 +640,7 @@ export default function HealthMonitor() {
               </button>
               <button
                 onClick={() => setTimeRange('all')}
-                className={`px-3 py-1 text-sm rounded-md ${
+                className={`px-3 py-1 text-sm rounded-md whitespace-nowrap ${
                   timeRange === 'all' 
                     ? 'bg-blue-500 text-white' 
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -486,22 +650,56 @@ export default function HealthMonitor() {
               </button>
             </div>
           </div>
-          <div className="h-[400px]">
-            {records.length > 0 ? (
-              <Line options={chartOptions} data={chartData} />
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-500">
-                <p>尚無健康紀錄資料</p>
+          
+          {records.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* 體溫圖表 */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-red-500" />
+                  體溫趨勢 (°C)
+                </h3>
+                <div className="h-[200px] sm:h-[250px]">
+                  <Line options={temperatureChartOptions} data={temperatureChartData} />
+                </div>
               </div>
-            )}
-          </div>
+              
+              {/* 心率圖表 */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-blue-500" />
+                  心率趨勢 (BPM)
+                </h3>
+                <div className="h-[200px] sm:h-[250px]">
+                  <Line options={heartRateChartOptions} data={heartRateChartData} />
+                </div>
+              </div>
+              
+              {/* 血氧圖表 */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  <div className="w-4 h-4 bg-teal-500 rounded-full"></div>
+                  血氧趨勢 (%)
+                </h3>
+                <div className="h-[200px] sm:h-[250px]">
+                  <Line options={oxygenChartOptions} data={oxygenChartData} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-gray-500">
+              <p>尚無健康紀錄資料</p>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">歷史紀錄</h2>
           </div>
-          <div className="overflow-x-auto">
+          
+          {/* 桌面版表格 */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -539,7 +737,15 @@ export default function HealthMonitor() {
                     return (
                       <tr key={record.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {new Date(record.recorded_at).toLocaleString('zh-TW')}
+                          {new Date(record.recorded_at).toLocaleString('zh-TW', {
+                            timeZone: 'Asia/Taipei',
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                          })}
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm ${getStatusColor(tempStatus)}`}>
                           {record.temperature}
@@ -572,6 +778,80 @@ export default function HealthMonitor() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* 手機版卡片 */}
+          <div className="md:hidden">
+            {records.length > 0 ? (
+              <div className="divide-y divide-gray-200">
+                {[...records].reverse().map((record) => {
+                  const tempStatus = getHealthStatus('temperature', record.temperature);
+                  const hrStatus = getHealthStatus('heart_rate', record.heart_rate);
+                  const o2Status = getHealthStatus('oxygen_level', record.oxygen_level);
+                  
+                  let overallStatus = 'normal';
+                  if (tempStatus === 'high' || hrStatus === 'high' || o2Status === 'low') {
+                    overallStatus = 'high';
+                  } else if (tempStatus === 'low' || hrStatus === 'low') {
+                    overallStatus = 'low';
+                  }
+                  
+                  return (
+                    <div key={record.id} className="p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="text-sm text-gray-600">
+                          {new Date(record.recorded_at).toLocaleString('zh-TW', {
+                            timeZone: 'Asia/Taipei',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          overallStatus === 'normal' ? 'bg-green-100 text-green-800' :
+                          overallStatus === 'high' ? 'bg-red-100 text-red-800' :
+                          'bg-blue-100 text-blue-800'
+                        }`}>
+                          {overallStatus === 'normal' ? '正常' :
+                           overallStatus === 'high' ? '異常' : '偏低'}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500 mb-1">體溫</div>
+                          <div className={`text-lg font-semibold ${getStatusColor(tempStatus)}`}>
+                            {record.temperature}
+                          </div>
+                          <div className="text-xs text-gray-400">°C</div>
+                        </div>
+                        
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500 mb-1">心率</div>
+                          <div className={`text-lg font-semibold ${getStatusColor(hrStatus)}`}>
+                            {record.heart_rate}
+                          </div>
+                          <div className="text-xs text-gray-400">BPM</div>
+                        </div>
+                        
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500 mb-1">血氧</div>
+                          <div className={`text-lg font-semibold ${getStatusColor(o2Status)}`}>
+                            {record.oxygen_level}
+                          </div>
+                          <div className="text-xs text-gray-400">%</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                尚無健康紀錄資料
+              </div>
+            )}
           </div>
         </div>
       </div>
