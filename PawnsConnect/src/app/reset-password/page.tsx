@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Lock, RotateCcw } from 'lucide-react';
+import { Loader2, Lock, RotateCcw, Mail } from 'lucide-react';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -17,42 +17,92 @@ export default function ResetPasswordPage() {
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [status, setStatus] = useState<'checking' | 'ready' | 'error'>('checking');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
+      console.log('🔐 [ResetPassword] 開始驗證重設密碼連結');
+      
       try {
+        // 檢查 URL 中是否有錯誤參數
+        const error = searchParams?.get('error');
+        const errorCode = searchParams?.get('error_code');
+        const errorDescription = searchParams?.get('error_description');
+        
+        if (error) {
+          console.log('❌ [ResetPassword] URL 中發現錯誤:', { error, errorCode, errorDescription });
+          
+          let userFriendlyMessage = '重設密碼連結無效';
+          
+          if (errorCode === 'otp_expired' || error === 'access_denied') {
+            userFriendlyMessage = '重設密碼連結已過期，請重新發送。';
+          } else if (errorDescription) {
+            userFriendlyMessage = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+          }
+          
+          if (!cancelled) {
+            setStatus('error');
+            setErrorMsg(userFriendlyMessage);
+          }
+          return;
+        }
+
         // 1) 若 hash 上有 access_token/refresh_token（常見的 recovery 連結），先以此建立 session
         if (typeof window !== 'undefined' && window.location.hash) {
           const h = window.location.hash;
+          console.log('🔍 [ResetPassword] 檢查 hash:', h);
+          
           if (/access_token=|refresh_token=|type=recovery/.test(h)) {
+            console.log('📧 [ResetPassword] 發現 recovery 連結參數');
             const params = new URLSearchParams(h.replace(/^#/, ''));
             const access_token = params.get('access_token');
             const refresh_token = params.get('refresh_token');
+            
             if (access_token && refresh_token) {
+              console.log('🔑 [ResetPassword] 嘗試建立 session');
               const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-              if (error) throw error;
+              if (error) {
+                console.error('❌ [ResetPassword] Session 建立失敗:', error);
+                throw error;
+              }
+              console.log('✅ [ResetPassword] Session 建立成功');
             }
             // 清除 hash 以避免其他頁面再次誤判
             const clean = window.location.pathname + window.location.search;
             window.history.replaceState(null, '', clean);
           }
         }
+        
         // 2) 若有 code 參數（另一種流程），用 code 交換 session
         const code = searchParams?.get('code');
         if (code) {
+          console.log('🔐 [ResetPassword] 發現 code 參數，嘗試交換 session');
           const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
+          if (error) {
+            console.error('❌ [ResetPassword] Code 交換失敗:', error);
+            throw error;
+          }
+          console.log('✅ [ResetPassword] Code 交換成功');
         }
+        
         const { data } = await supabase.auth.getSession();
+        console.log('📊 [ResetPassword] 檢查最終 session 狀態:', !!data.session);
+        
         if (!cancelled) {
           setStatus(data.session ? 'ready' : 'error');
-          if (!data.session) setErrorMsg('連結無效或已過期，請重新發送重設郵件。');
+          if (!data.session) {
+            setErrorMsg('連結無效或已過期，請重新發送重設郵件。');
+          } else {
+            console.log('🎉 [ResetPassword] 重設密碼準備就緒');
+          }
         }
       } catch (err: any) {
+        console.error('💥 [ResetPassword] 驗證過程發生錯誤:', err);
         if (!cancelled) {
           setStatus('error');
           setErrorMsg(err?.message || '驗證連結時發生錯誤，請重新發送重設郵件。');
@@ -101,6 +151,48 @@ export default function ResetPasswordPage() {
     }
   };
 
+  const resendResetEmail = async () => {
+    if (!email.trim()) {
+      toast({ 
+        title: '請輸入郵件地址', 
+        description: '請輸入您的註冊郵件地址以重新發送重設連結。', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      console.log('📧 [ResetPassword] 重新發送重設郵件:', email);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `https://7jjl14w0-3000.asse.devtunnels.ms/reset-password`
+      });
+      
+      if (error) {
+        console.error('❌ [ResetPassword] 發送重設郵件失敗:', error);
+        throw error;
+      }
+      
+      console.log('✅ [ResetPassword] 重設郵件發送成功');
+      toast({
+        title: '重設郵件已發送',
+        description: '請檢查您的郵箱並點擊新的重設密碼連結。',
+      });
+      
+      setEmail(''); // 清空輸入框
+    } catch (err: any) {
+      console.error('💥 [ResetPassword] 重新發送失敗:', err);
+      toast({
+        title: '發送失敗',
+        description: err?.message || '無法發送重設郵件，請稍後再試。',
+        variant: 'destructive'
+      });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   if (status === 'checking') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
@@ -115,11 +207,59 @@ export default function ResetPasswordPage() {
       <div className="max-w-md mx-auto w-full">
         <Card className="shadow-xl">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-2xl"><RotateCcw className="w-5 h-5"/> 需要重新發送</CardTitle>
-            <CardDescription>{errorMsg}</CardDescription>
+            <CardTitle className="flex items-center gap-2 text-2xl">
+              <RotateCcw className="w-5 h-5"/> 連結已過期
+            </CardTitle>
+            <CardDescription className="text-red-600">
+              {errorMsg}
+            </CardDescription>
           </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-800 mb-3">
+                💡 <strong>解決方案：</strong>重新發送重設密碼郵件
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="resend-email">請輸入您的郵件地址</Label>
+                  <Input
+                    id="resend-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="mt-1"
+                  />
+                </div>
+                <Button 
+                  onClick={resendResetEmail} 
+                  disabled={sendingEmail}
+                  className="w-full"
+                  variant="outline"
+                >
+                  {sendingEmail ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
+                      發送中...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="mr-2 h-4 w-4"/>
+                      重新發送重設郵件
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={() => router.replace('/welcome')}>回到登入</Button>
+            <Button 
+              className="w-full" 
+              onClick={() => router.replace('/welcome')}
+              variant="secondary"
+            >
+              回到登入頁面
+            </Button>
           </CardFooter>
         </Card>
       </div>

@@ -80,13 +80,31 @@ export const AuthForm = () => {
     try {
       if (authMode === 'login') {
         const { email, password } = data as LoginFormValues;
-        await login(email, password);
+        const result = await login(email, password);
+        if (result.error) {
+          toast({
+            title: '登入失敗',
+            description: result.error,
+            variant: 'destructive',
+          });
+          return;
+        }
         toast({ title: '登入成功', description: "歡迎回來！" });
         router.push('/');
       } else {
         const { email, password, role, fullName } = data as SignupFormValues;
-        await signUp(email, password, role, fullName);
-        toast({ title: '註冊成功', description: '歡迎！請檢查您的電子郵件以驗證您的帳戶。' });
+        const result = await signUp(email, password, role, fullName);
+        if (result.error) {
+          toast({
+            title: '註冊失敗',
+            description: result.error,
+            variant: 'destructive',
+          });
+          return;
+        }
+        
+        // 註冊成功，直接導向首頁
+        toast({ title: '註冊成功', description: '歡迎加入 PawsConnect！' });
         router.push('/');
       }
     } catch (error: any) {
@@ -151,12 +169,12 @@ export const AuthForm = () => {
               <div>
                 <Label htmlFor="confirmPassword">確認密碼</Label>
                 <Input id="confirmPassword" type="password" {...register('confirmPassword')} placeholder="••••••••" />
-                {errors.confirmPassword && <p className="text-xs text-destructive mt-1">{errors.confirmPassword.message}</p>}
+                {'confirmPassword' in errors && errors.confirmPassword && <p className="text-xs text-destructive mt-1">{errors.confirmPassword.message}</p>}
               </div>
               <div>
                 <Label htmlFor="fullName">全名 (選填)</Label>
                 <Input id="fullName" type="text" {...register('fullName')} placeholder="您的姓名" />
-                {errors.fullName && <p className="text-xs text-destructive mt-1">{errors.fullName.message}</p>}
+                {'fullName' in errors && errors.fullName && <p className="text-xs text-destructive mt-1">{errors.fullName.message}</p>}
               </div>
               <div>
                 <Label>我的身份是...</Label>
@@ -167,7 +185,7 @@ export const AuthForm = () => {
                   </TabsList>
                 </Tabs>
                 <input type="hidden" {...register('role')} value={selectedRole} />
-                 {errors.role && <p className="text-xs text-destructive mt-1">{errors.role.message}</p>}
+                 {authMode === 'signup' && 'role' in errors && errors.role && <p className="text-xs text-destructive mt-1">{errors.role.message}</p>}
               </div>
             </>
           )}
