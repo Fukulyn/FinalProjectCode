@@ -7,17 +7,47 @@ import { Link } from 'react-router-dom';
 
 export default function PetProfile() {
   const { user } = useAuthStore();
+
+  // 品種資料
+  const breedOptions = {
+    狗: [
+      '黃金獵犬',
+      '拉布拉多',
+      '德國牧羊犬',
+      '比格犬',
+      '柴犬',
+      '博美犬',
+      '吉娃娃',
+      '法國鬥牛犬',
+      '邊境牧羊犬',
+      '哈士奇'
+    ],
+    貓: [
+      '英國短毛貓',
+      '美國短毛貓',
+      '波斯貓',
+      '暹羅貓',
+      '緬因貓',
+      '布偶貓',
+      '俄羅斯藍貓',
+      '蘇格蘭摺耳貓',
+      '孟加拉貓',
+      '阿比西尼亞貓'
+    ]
+  };
+
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingPet, setEditingPet] = useState<Pet | null>(null);
   const [formData, setFormData] = useState({
-  name: '',
-  breed: '',
-  birth_date: '',
-  weight: '',
-  photo: '', // 單一圖片網址，送出時包成陣列
-  location: '',
+    name: '',
+    type: '', // 新增：貓或狗
+    breed: '',
+    birth_date: '',
+    weight: '',
+    photo: '', // 單一圖片網址，送出時包成陣列
+    location: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +83,7 @@ export default function PetProfile() {
         // 更新現有寵物 - 準備更新資料
         const updateData: Record<string, unknown> = {
           name: formData.name,
+          type: formData.type,
           breed: formData.breed,
           birth_date: formData.birth_date,
           weight: parseFloat(formData.weight),
@@ -73,6 +104,7 @@ export default function PetProfile() {
         const insertData: Record<string, unknown> = {
           user_id: user?.id,
           name: formData.name,
+          type: formData.type,
           breed: formData.breed,
           birth_date: formData.birth_date,
           weight: parseFloat(formData.weight),
@@ -89,6 +121,7 @@ export default function PetProfile() {
       if (error) throw error;
       setFormData({
         name: '',
+        type: '',
         breed: '',
         birth_date: '',
         weight: '',
@@ -112,10 +145,40 @@ export default function PetProfile() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
+  };
+
+  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { value } = e.target;
+    
+    setFormData({
+      ...formData,
+      type: value,
+      breed: '', // 重置品種選擇
+    });
+  };
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    
+    setFormData({
+      ...formData,
+      birth_date: value,
+    });
+  };
+
+  const handleDateFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.showPicker?.(); // 嘗試顯示日期選擇器
+  };
+
+  const handleDateClick = (e: React.MouseEvent<HTMLInputElement>) => {
+    const target = e.target as HTMLInputElement;
+    target.showPicker?.(); // 嘗試顯示日期選擇器
   };
 
   const handleEdit = (pet: Pet) => {
@@ -126,10 +189,40 @@ export default function PetProfile() {
       photoUrl = pet.photos[0];
     }
     
+    // 處理出生日期格式
+    let birthDateValue = '';
+    if (pet.birth_date) {
+      // 如果日期已經是 YYYY-MM-DD 格式，直接使用
+      if (pet.birth_date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        birthDateValue = pet.birth_date;
+      } else {
+        // 否則轉換格式
+        const date = new Date(pet.birth_date);
+        if (!isNaN(date.getTime())) {
+          birthDateValue = date.toISOString().split('T')[0];
+        }
+      }
+    }
+
+    // 處理寵物類型：如果沒有 type 欄位，根據品種推斷
+    let petType = pet.type || '';
+    if (!petType && pet.breed) {
+      // 根據品種推斷寵物類型
+      const dogBreeds = breedOptions.狗;
+      const catBreeds = breedOptions.貓;
+      
+      if (dogBreeds.includes(pet.breed)) {
+        petType = '狗';
+      } else if (catBreeds.includes(pet.breed)) {
+        petType = '貓';
+      }
+    }
+    
     setFormData({
       name: pet.name,
+      type: petType,
       breed: pet.breed || '',
-      birth_date: pet.birth_date ? new Date(pet.birth_date).toISOString().split('T')[0] : '',
+      birth_date: birthDateValue,
       weight: pet.weight.toString(),
       photo: photoUrl,
       location: pet.location || '',
@@ -195,6 +288,7 @@ export default function PetProfile() {
                   setEditingPet(null);
                   setFormData({
                     name: '',
+                    type: '',
                     breed: '',
                     birth_date: '',
                     weight: '',
@@ -244,17 +338,40 @@ export default function PetProfile() {
                   />
                 </div>
                 <div>
+                  <label htmlFor="type" className="block text-sm font-medium text-gray-700">寵物類型</label>
+                  <select
+                    name="type"
+                    id="type"
+                    value={formData.type}
+                    onChange={handleTypeChange}
+                    required
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="">請選擇寵物類型</option>
+                    <option value="狗">🐕 狗狗</option>
+                    <option value="貓">🐱 貓咪</option>
+                  </select>
+                </div>
+                <div>
                   <label htmlFor="breed" className="block text-sm font-medium text-gray-700">品種</label>
-                  <input
-                    type="text"
+                  <select
                     name="breed"
                     id="breed"
                     value={formData.breed}
                     onChange={handleChange}
-                    placeholder="請輸入寵物品種"
-                    aria-label="寵物品種"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
+                    disabled={!formData.type}
+                    required
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50"
+                  >
+                    <option value="">
+                      {formData.type ? `請選擇${formData.type}品種` : '請先選擇寵物類型'}
+                    </option>
+                    {formData.type && breedOptions[formData.type as keyof typeof breedOptions]?.map((breed) => (
+                      <option key={breed} value={breed}>
+                        {breed}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="birth_date" className="block text-sm font-medium text-gray-700">出生日期</label>
@@ -262,11 +379,13 @@ export default function PetProfile() {
                     type="date"
                     name="birth_date"
                     id="birth_date"
-                    value={formData.birth_date}
-                    onChange={handleChange}
+                    value={formData.birth_date || ''}
+                    onChange={handleDateChange}
+                    onFocus={handleDateFocus}
+                    onClick={handleDateClick}
+                    disabled={submitting}
                     aria-label="寵物出生日期"
-                    placeholder="請選擇出生日期"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50"
                   />
                 </div>
                 <div>
