@@ -12,10 +12,12 @@ export default function PetProfile() {
   const [showForm, setShowForm] = useState(false);
   const [editingPet, setEditingPet] = useState<Pet | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    breed: '',
-    birth_date: '',
-    weight: '',
+  name: '',
+  breed: '',
+  birth_date: '',
+  weight: '',
+  photo: '', // 單一圖片網址，送出時包成陣列
+  location: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,47 +47,58 @@ export default function PetProfile() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-
     try {
+      let error;
       if (editingPet) {
-        // 更新現有寵物
-        const { error } = await supabase
+        // 更新現有寵物 - 準備更新資料
+        const updateData: Record<string, unknown> = {
+          name: formData.name,
+          breed: formData.breed,
+          birth_date: formData.birth_date,
+          weight: parseFloat(formData.weight),
+          location: formData.location,
+        };
+        
+        // 只有在有圖片時才加入 photos 欄位
+        if (formData.photo) {
+          updateData.photos = [formData.photo];
+        }
+        
+        ({ error } = await supabase
           .from('pets')
-          .update({
-            name: formData.name,
-            breed: formData.breed,
-            birth_date: formData.birth_date,
-            weight: parseFloat(formData.weight),
-          })
-          .eq('id', editingPet.id);
-
-        if (error) throw error;
+          .update(updateData)
+          .eq('id', editingPet.id));
       } else {
-        // 新增寵物
-        const { error } = await supabase.from('pets').insert([
-          {
-            user_id: user?.id,
-            name: formData.name,
-            breed: formData.breed,
-            birth_date: formData.birth_date,
-            weight: parseFloat(formData.weight),
-          },
-        ]);
-
-        if (error) throw error;
+        // 新增寵物 - 準備插入資料
+        const insertData: Record<string, unknown> = {
+          user_id: user?.id,
+          name: formData.name,
+          breed: formData.breed,
+          birth_date: formData.birth_date,
+          weight: parseFloat(formData.weight),
+          location: formData.location,
+        };
+        
+        // 只有在有圖片時才加入 photos 欄位
+        if (formData.photo) {
+          insertData.photos = [formData.photo];
+        }
+        
+        ({ error } = await supabase.from('pets').insert([insertData]));
       }
-
+      if (error) throw error;
       setFormData({
         name: '',
         breed: '',
         birth_date: '',
         weight: '',
+        photo: '',
+        location: '',
       });
       setShowForm(false);
       setEditingPet(null);
       fetchPets();
     } catch (error: unknown) {
-      // Supabase 的 error 物件通常有 message 屬性
       if (error && typeof error === 'object' && 'message' in error) {
         setError((error as { message?: string }).message || JSON.stringify(error));
         console.error('Error saving pet:', error, (error as { message?: string }).message, JSON.stringify(error));
@@ -107,11 +120,19 @@ export default function PetProfile() {
 
   const handleEdit = (pet: Pet) => {
     setEditingPet(pet);
+    // 處理 photos 欄位：可能是陣列或 null
+    let photoUrl = '';
+    if (pet.photos && Array.isArray(pet.photos) && pet.photos.length > 0) {
+      photoUrl = pet.photos[0];
+    }
+    
     setFormData({
       name: pet.name,
       breed: pet.breed || '',
       birth_date: pet.birth_date ? new Date(pet.birth_date).toISOString().split('T')[0] : '',
       weight: pet.weight.toString(),
+      photo: photoUrl,
+      location: pet.location || '',
     });
     setShowForm(true);
   };
@@ -177,6 +198,8 @@ export default function PetProfile() {
                     breed: '',
                     birth_date: '',
                     weight: '',
+                    photo: '',
+                    location: '',
                   });
                   setShowForm(true);
                 }}
@@ -220,7 +243,6 @@ export default function PetProfile() {
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
-
                 <div>
                   <label htmlFor="breed" className="block text-sm font-medium text-gray-700">品種</label>
                   <input
@@ -260,6 +282,48 @@ export default function PetProfile() {
                     step="0.1"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
+                </div>
+                <div>
+                  <label htmlFor="photo" className="block text-sm font-medium text-gray-700">寵物圖片網址</label>
+                  <input
+                    type="url"
+                    name="photo"
+                    id="photo"
+                    value={formData.photo}
+                    onChange={handleChange}
+                    placeholder="請貼上寵物圖片網址或上傳後取得網址"
+                    aria-label="寵物圖片網址"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="location" className="block text-sm font-medium text-gray-700">收容所名稱</label>
+                  <select
+                    name="location"
+                    id="location"
+                    value={formData.location}
+                    onChange={handleChange}
+                    aria-label="收容所名稱"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="">請選擇收容所</option>
+                    <optgroup label="基隆市">
+                      <option value="基隆市寵物銀行">基隆市寵物銀行</option>
+                    </optgroup>
+                    <optgroup label="新北市">
+                      <option value="新北市板橋區公立動物之家">新北市板橋區公立動物之家</option>
+                      <option value="新北市新店區公立動物之家">新北市新店區公立動物之家</option>
+                      <option value="新北市中和區公立動物之家">新北市中和區公立動物之家</option>
+                      <option value="新北市淡水區公立動物之家">新北市淡水區公立動物之家</option>
+                      <option value="新北市瑞芳區公立動物之家">新北市瑞芳區公立動物之家</option>
+                      <option value="新北市五股區公立動物之家">新北市五股區公立動物之家</option>
+                      <option value="新北市八里區公立動物之家">新北市八里區公立動物之家</option>
+                      <option value="新北市三芝區公立動物之家">新北市三芝區公立動物之家</option>
+                    </optgroup>
+                    <optgroup label="臺北市">
+                      <option value="臺北市動物之家">臺北市動物之家</option>
+                    </optgroup>
+                  </select>
                 </div>
                 <div className="flex gap-4 mt-6">
                   <button
@@ -309,12 +373,19 @@ export default function PetProfile() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-green-100 text-green-500">
-                      <PawPrint className="w-6 h-6" />
-                    </div>
+                    {pet.photos && Array.isArray(pet.photos) && pet.photos.length > 0 && pet.photos[0] ? (
+                      <img src={pet.photos[0]} alt="寵物圖片" className="w-16 h-16 rounded-full object-cover border" />
+                    ) : (
+                      <div className="p-2 rounded-full bg-green-100 text-green-500">
+                        <PawPrint className="w-6 h-6" />
+                      </div>
+                    )}
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">{pet.name}</h3>
                       <p className="text-sm text-gray-500">{pet.breed}</p>
+                      {pet.location && (
+                        <p className="text-xs text-gray-400 mt-1">收容所：{pet.location}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-2">
