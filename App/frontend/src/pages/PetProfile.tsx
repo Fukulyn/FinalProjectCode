@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Plus, PawPrint, Loader2, Home, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
-import { Pet } from '../types';
+import { Pet, PetData } from '../types';
 import { Link } from 'react-router-dom';
+import { createPet, updatePet } from '../lib/petApi';
 
 export default function PetProfile() {
   const { user } = useAuthStore();
@@ -20,7 +21,8 @@ export default function PetProfile() {
       '吉娃娃',
       '法國鬥牛犬',
       '邊境牧羊犬',
-      '哈士奇'
+      '哈士奇',
+      '米克斯',
     ],
     貓: [
       '英國短毛貓',
@@ -77,48 +79,51 @@ export default function PetProfile() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    
     try {
-      let error;
-      if (editingPet) {
-        // 更新現有寵物 - 準備更新資料
-        const updateData: Record<string, unknown> = {
-          name: formData.name,
-          type: formData.type,
-          breed: formData.breed,
-          birth_date: formData.birth_date,
-          weight: parseFloat(formData.weight),
-          location: formData.location,
-        };
-        
-        // 只有在有圖片時才加入 photos 欄位
-        if (formData.photo) {
-          updateData.photos = [formData.photo];
-        }
-        
-        ({ error } = await supabase
-          .from('pets')
-          .update(updateData)
-          .eq('id', editingPet.id));
-      } else {
-        // 新增寵物 - 準備插入資料
-        const insertData: Record<string, unknown> = {
-          user_id: user?.id,
-          name: formData.name,
-          type: formData.type,
-          breed: formData.breed,
-          birth_date: formData.birth_date,
-          weight: parseFloat(formData.weight),
-          location: formData.location,
-        };
-        
-        // 只有在有圖片時才加入 photos 欄位
-        if (formData.photo) {
-          insertData.photos = [formData.photo];
-        }
-        
-        ({ error } = await supabase.from('pets').insert([insertData]));
+      // 檢查用戶登入狀態
+      if (!user?.id) {
+        throw new Error('用戶未登入，請重新登入後再試');
       }
-      if (error) throw error;
+
+      // 再次確認當前認證狀態
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !currentUser) {
+        console.error('認證檢查失敗:', authError);
+        throw new Error('認證狀態無效，請重新登入');
+      }
+
+      console.log('🔐 當前認證狀態:', {
+        storeUserId: user.id,
+        currentUserId: currentUser.id,
+        userEmail: currentUser.email
+      });
+
+      const petData: PetData = {
+        name: formData.name,
+        type: formData.type,
+        breed: formData.breed,
+        birth_date: formData.birth_date,
+        weight: formData.weight ? parseFloat(formData.weight) : undefined,
+        location: formData.location,
+        photos: formData.photo ? [formData.photo] : undefined,
+      };
+
+      let result;
+      if (editingPet) {
+        // 更新現有寵物
+        result = await updatePet(editingPet.id, petData);
+      } else {
+        // 新增寵物
+        result = await createPet(currentUser.id, petData);
+      }
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      // 重置表單和重新載入資料
       setFormData({
         name: '',
         type: '',
@@ -172,13 +177,19 @@ export default function PetProfile() {
     });
   };
 
-  const handleDateFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.showPicker?.(); // 嘗試顯示日期選擇器
+  const handleDateFocus = () => {
+    // 移除自動 showPicker，讓瀏覽器自然處理
   };
 
   const handleDateClick = (e: React.MouseEvent<HTMLInputElement>) => {
     const target = e.target as HTMLInputElement;
-    target.showPicker?.(); // 嘗試顯示日期選擇器
+    // 只在用戶點擊時嘗試顯示日期選擇器
+    try {
+      target.showPicker?.();
+    } catch (error) {
+      // 忽略 showPicker 錯誤，讓瀏覽器使用預設行為
+      console.debug('showPicker not available or failed:', error);
+    }
   };
 
   const handleEdit = (pet: Pet) => {
@@ -308,7 +319,7 @@ export default function PetProfile() {
       </nav>
 
       <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">我的寵物</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-8">浪浪管理</h1>
 
         {error && (
           <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg">
