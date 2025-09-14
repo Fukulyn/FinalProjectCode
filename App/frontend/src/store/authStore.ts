@@ -32,7 +32,12 @@ export const useAuthStore = create<AuthState>((set) => ({
           created_at: data.user.created_at,
         },
       });
-      console.log('user 狀態已設置', data.user);
+      console.log('✅ 用戶登入成功:', {
+        userId: data.user.id,
+        email: data.user.email,
+        tabId: window.sessionStorage.key(0)?.includes('supabase.auth.token') ? 
+               window.sessionStorage.key(0)?.split('.').pop() : 'unknown'
+      });
     } else {
       console.log('data.user 為 null', data);
     }
@@ -56,9 +61,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signOut: async () => {
+    const currentUser = useAuthStore.getState().user;
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     set({ user: null });
+    console.log('🚪 用戶登出成功:', {
+      previousUser: currentUser?.email,
+      tabId: window.sessionStorage.key(0)?.includes('supabase.auth.token') ? 
+             window.sessionStorage.key(0)?.split('.').pop() : 'unknown'
+    });
   },
 
   checkAuth: async () => {

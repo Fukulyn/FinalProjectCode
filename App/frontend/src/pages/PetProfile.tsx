@@ -81,6 +81,25 @@ export default function PetProfile() {
     setError(null);
     
     try {
+      // 檢查用戶登入狀態
+      if (!user?.id) {
+        throw new Error('用戶未登入，請重新登入後再試');
+      }
+
+      // 再次確認當前認證狀態
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !currentUser) {
+        console.error('認證檢查失敗:', authError);
+        throw new Error('認證狀態無效，請重新登入');
+      }
+
+      console.log('🔐 當前認證狀態:', {
+        storeUserId: user.id,
+        currentUserId: currentUser.id,
+        userEmail: currentUser.email
+      });
+
       const petData: PetData = {
         name: formData.name,
         type: formData.type,
@@ -97,10 +116,7 @@ export default function PetProfile() {
         result = await updatePet(editingPet.id, petData);
       } else {
         // 新增寵物
-        if (!user?.id) {
-          throw new Error('用戶未登入');
-        }
-        result = await createPet(user.id, petData);
+        result = await createPet(currentUser.id, petData);
       }
 
       if (result.error) {
