@@ -17,6 +17,16 @@ export interface Pet {
   location?: string;
 }
 
+export interface PetData {
+  name: string;
+  type: string;
+  breed: string;
+  birth_date: string;
+  weight?: number;
+  location?: string;
+  photos?: string[];
+}
+
 export interface HealthRecord {
   id: string;
   pet_id: string;
