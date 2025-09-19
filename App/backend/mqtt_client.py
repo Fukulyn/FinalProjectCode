@@ -5,7 +5,7 @@ import json
 from paho.mqtt.enums import CallbackAPIVersion
 
 # MQTT 配置
-MQTT_BROKER_URL = "broker.emqx.io"
+MQTT_BROKER_URL = "broker.hivemq.com"
 MQTT_PORT = 1883
 MQTT_TOPIC = "pet/manager/topic/collar" # 专门用于宠物项圈数据的主题
 MQTT_USERNAME = "petmanager"  # MQTT 用戶名

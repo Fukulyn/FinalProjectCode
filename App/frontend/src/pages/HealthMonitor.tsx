@@ -68,9 +68,9 @@ export default function HealthMonitor() {
   };
 
   const latestRecord = records[records.length - 1];
-  const temperatureStatus = latestRecord ? getHealthStatus('temperature', latestRecord.temperature) : 'normal';
-  const heartRateStatus = latestRecord ? getHealthStatus('heart_rate', latestRecord.heart_rate) : 'normal';
-  const oxygenStatus = latestRecord ? getHealthStatus('oxygen_level', latestRecord.oxygen_level) : 'normal';
+  const temperatureStatus = latestRecord && latestRecord.temperature > 0 ? getHealthStatus('temperature', latestRecord.temperature) : 'normal';
+  const heartRateStatus = latestRecord && latestRecord.heart_rate > 0 ? getHealthStatus('heart_rate', latestRecord.heart_rate) : 'normal';
+  const oxygenStatus = latestRecord && latestRecord.oxygen_level > 0 ? getHealthStatus('oxygen_level', latestRecord.oxygen_level) : 'normal';
 
   // 檢查是否有異常狀態
   const hasAbnormalStatus = () => {
@@ -248,6 +248,72 @@ export default function HealthMonitor() {
     }
   };
 
+  // 資料聚合函數：將健康記錄按日期分組並計算每日平均值
+  const aggregateDataByDay = (healthRecords: HealthRecord[]) => {
+    const dailyData: {[date: string]: {
+      temperature: number[],
+      heart_rate: number[],
+      oxygen_level: number[],
+      date: string
+    }} = {};
+
+    // 按日期分組資料
+    healthRecords.forEach(record => {
+      const date = new Date(record.recorded_at);
+      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD 格式
+      
+      if (!dailyData[dateKey]) {
+        dailyData[dateKey] = {
+          temperature: [],
+          heart_rate: [],
+          oxygen_level: [],
+          date: dateKey
+        };
+      }
+      
+      // 過濾掉 0 或無效值
+      if (record.temperature && record.temperature > 0) {
+        dailyData[dateKey].temperature.push(record.temperature);
+      }
+      if (record.heart_rate && record.heart_rate > 0) {
+        dailyData[dateKey].heart_rate.push(record.heart_rate);
+      }
+      if (record.oxygen_level && record.oxygen_level > 0) {
+        dailyData[dateKey].oxygen_level.push(record.oxygen_level);
+      }
+    });
+
+    // 計算每日平均值並轉換為圖表格式
+    return Object.values(dailyData)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(dayData => ({
+        date: dayData.date,
+        displayDate: new Date(dayData.date).toLocaleDateString('zh-TW', {
+          month: 'short',
+          day: 'numeric'
+        }),
+        temperature: dayData.temperature.length > 0 
+          ? dayData.temperature.reduce((sum, val) => sum + val, 0) / dayData.temperature.length 
+          : null,
+        heart_rate: dayData.heart_rate.length > 0 
+          ? dayData.heart_rate.reduce((sum, val) => sum + val, 0) / dayData.heart_rate.length 
+          : null,
+        oxygen_level: dayData.oxygen_level.length > 0 
+          ? dayData.oxygen_level.reduce((sum, val) => sum + val, 0) / dayData.oxygen_level.length 
+          : null,
+      }));
+  };
+
+  // 聚合每日資料
+  const dailyAggregatedData = aggregateDataByDay(records);
+
+  // 過濾掉包含0值的歷史記錄
+  const validHistoryRecords = records.filter(record => 
+    record.temperature > 0 && 
+    record.heart_rate > 0 && 
+    record.oxygen_level > 0
+  );
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -342,21 +408,14 @@ export default function HealthMonitor() {
 
   // 體溫圖表數據
   const temperatureChartData = {
-    labels: records.map(data => 
-      new Date(data.recorded_at).toLocaleTimeString('zh-TW', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        month: 'short',
-        day: 'numeric'
-      })
-    ),
+    labels: dailyAggregatedData.map(data => data.displayDate),
     datasets: [
       {
-        data: records.map(data => data.temperature),
+        data: dailyAggregatedData.map(data => data.temperature),
         borderColor: 'rgb(239, 68, 68)',
         backgroundColor: 'rgba(239, 68, 68, 0.8)',
-        borderWidth: 0,
-        showLine: false,
+        borderWidth: 2,
+        showLine: true,
         fill: false,
         pointBackgroundColor: 'rgb(239, 68, 68)',
         pointBorderColor: '#fff',
@@ -368,70 +427,36 @@ export default function HealthMonitor() {
     ],
   };  // 心率圖表數據
   const heartRateChartData = {
-    labels: records.map(record => {
-      const date = new Date(record.recorded_at);
-      if (isMobile) {
-        return date.toLocaleString('zh-TW', {
-          month: 'numeric',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit'
-        });
-      } else {
-        return date.toLocaleString('zh-TW', {
-          month: 'numeric',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: 'numeric'
-        });
-      }
-    }),
+    labels: dailyAggregatedData.map(data => data.displayDate),
     datasets: [
       {
         label: '心率 (BPM)',
-        data: records.map(record => record.heart_rate),
+        data: dailyAggregatedData.map(data => data.heart_rate),
         borderColor: 'rgb(53, 162, 235)',
         backgroundColor: 'rgba(53, 162, 235, 0.8)',
-        borderWidth: 0,
-        showLine: false,
+        borderWidth: 2,
+        showLine: true,
         fill: false,
         pointBackgroundColor: 'rgb(53, 162, 235)',
         pointBorderColor: '#fff',
         pointBorderWidth: 2,
-        pointRadius: 5,
-        pointHoverRadius: 8,
+        pointRadius: 4,
+        pointHoverRadius: 6,
       }
     ],
   };
 
   // 血氧圖表數據
   const oxygenChartData = {
-    labels: records.map(record => {
-      const date = new Date(record.recorded_at);
-      if (isMobile) {
-        return date.toLocaleString('zh-TW', {
-          month: 'numeric',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit'
-        });
-      } else {
-        return date.toLocaleString('zh-TW', {
-          month: 'numeric',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: 'numeric'
-        });
-      }
-    }),
+    labels: dailyAggregatedData.map(data => data.displayDate),
     datasets: [
       {
         label: '血氧 (%)',
-        data: records.map(record => record.oxygen_level),
+        data: dailyAggregatedData.map(data => data.oxygen_level),
         borderColor: 'rgb(75, 192, 192)',
         backgroundColor: 'rgba(75, 192, 192, 0.8)',
-        borderWidth: 0,
-        showLine: false,
+        borderWidth: 2,
+        showLine: true,
         fill: false,
         pointBackgroundColor: 'rgb(75, 192, 192)',
         pointBorderColor: '#fff',
@@ -534,9 +559,9 @@ export default function HealthMonitor() {
               <h2 className="text-lg font-semibold">體溫</h2>
             </div>
             <p className="text-3xl font-bold text-gray-900">
-              {latestRecord?.temperature || '--'} °C
+              {latestRecord?.temperature && latestRecord.temperature > 0 ? latestRecord.temperature : '--'} °C
             </p>
-            {latestRecord && (
+            {latestRecord && latestRecord.temperature > 0 && (
               <p className={`text-sm ${getStatusColor(temperatureStatus)} mt-1 flex items-center gap-1`}>
                 <span className={`w-2 h-2 rounded-full ${
                   temperatureStatus === 'normal' ? 'bg-green-500' :
@@ -553,9 +578,9 @@ export default function HealthMonitor() {
               <h2 className="text-lg font-semibold">心率</h2>
             </div>
             <p className="text-3xl font-bold text-gray-900">
-              {latestRecord?.heart_rate || '--'} BPM
+              {latestRecord?.heart_rate && latestRecord.heart_rate > 0 ? latestRecord.heart_rate : '--'} BPM
             </p>
-            {latestRecord && (
+            {latestRecord && latestRecord.heart_rate > 0 && (
               <p className={`text-sm ${getStatusColor(heartRateStatus)} mt-1 flex items-center gap-1`}>
                 <span className={`w-2 h-2 rounded-full ${
                   heartRateStatus === 'normal' ? 'bg-green-500' :
@@ -572,9 +597,9 @@ export default function HealthMonitor() {
               <h2 className="text-lg font-semibold">血氧</h2>
             </div>
             <p className="text-3xl font-bold text-gray-900">
-              {latestRecord?.oxygen_level || '--'}%
+              {latestRecord?.oxygen_level && latestRecord.oxygen_level > 0 ? latestRecord.oxygen_level : '--'}%
             </p>
-            {latestRecord && (
+            {latestRecord && latestRecord.oxygen_level > 0 && (
               <p className={`text-sm ${getStatusColor(oxygenStatus)} mt-1 flex items-center gap-1`}>
                 <span className={`w-2 h-2 rounded-full ${
                   oxygenStatus === 'normal' ? 'bg-green-500' : 'bg-red-500'
@@ -721,8 +746,10 @@ export default function HealthMonitor() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {records.length > 0 ? (
-                  [...records].reverse().map((record) => {
+                {validHistoryRecords.length > 0 ? (
+                  [...validHistoryRecords]
+                    .reverse()
+                    .map((record) => {
                     const tempStatus = getHealthStatus('temperature', record.temperature);
                     const hrStatus = getHealthStatus('heart_rate', record.heart_rate);
                     const o2Status = getHealthStatus('oxygen_level', record.oxygen_level);
@@ -782,9 +809,11 @@ export default function HealthMonitor() {
 
           {/* 手機版卡片 */}
           <div className="md:hidden">
-            {records.length > 0 ? (
+            {validHistoryRecords.length > 0 ? (
               <div className="divide-y divide-gray-200">
-                {[...records].reverse().map((record) => {
+                {[...validHistoryRecords]
+                  .reverse()
+                  .map((record) => {
                   const tempStatus = getHealthStatus('temperature', record.temperature);
                   const hrStatus = getHealthStatus('heart_rate', record.heart_rate);
                   const o2Status = getHealthStatus('oxygen_level', record.oxygen_level);
