@@ -50,18 +50,23 @@ export default function HealthMonitor() {
     switch (type) {
       case 'temperature':
         if (isDog) {
-          return value > 39.2 ? 'high' : value < 3? 'low' : 'normal';
+          // 狗的正常體溫：37.5-39.2°C
+          return value > 39.2 ? 'high' : value < 37.5 ? 'low' : 'normal';
         } else {
-          return value > 39.5 ? 'high' : value < 38.1 ? 'low' : 'normal';
+          // 貓的正常體溫：38.0-39.5°C
+          return value > 39.5 ? 'high' : value < 38.0 ? 'low' : 'normal';
         }
       case 'heart_rate':
         if (isDog) {
-          return value > 140 ? 'high' : value < 60 ? 'low' : 'normal';
+          // 狗的正常心率：70-160 BPM (依體型而定，小型犬較高)
+          return value > 160 ? 'high' : value < 70 ? 'low' : 'normal';
         } else {
-          return value > 200 ? 'high' : value < 120 ? 'low' : 'normal';
+          // 貓的正常心率：140-220 BPM
+          return value > 220 ? 'high' : value < 140 ? 'low' : 'normal';
         }
       case 'oxygen_level':
-        return value < 95 ? 'low' : 'normal';
+        // 犬貓血氧正常值：97-100%，<95%為異常低，>99%可能感測器異常
+        return value < 95 ? 'low' : value > 99 ? 'high' : 'normal';
       default:
         return 'normal';
     }
@@ -362,11 +367,11 @@ export default function HealthMonitor() {
       ...chartOptions.scales,
       y: {
         ...chartOptions.scales.y,
-        min: 26,
-        max: 44,
+        min: 35,
+        max: 42,
         ticks: {
           ...chartOptions.scales.y.ticks,
-          stepSize: 2
+          stepSize: 1
         }
       }
     }
@@ -379,11 +384,11 @@ export default function HealthMonitor() {
       ...chartOptions.scales,
       y: {
         ...chartOptions.scales.y,
-        min: 70,
-        max: 200,
+        min: 50,
+        max: 250,
         ticks: {
           ...chartOptions.scales.y.ticks,
-          stepSize: 10
+          stepSize: 20
         }
       }
     }
@@ -602,7 +607,8 @@ export default function HealthMonitor() {
             {latestRecord && latestRecord.oxygen_level > 0 && (
               <p className={`text-sm ${getStatusColor(oxygenStatus)} mt-1 flex items-center gap-1`}>
                 <span className={`w-2 h-2 rounded-full ${
-                  oxygenStatus === 'normal' ? 'bg-green-500' : 'bg-red-500'
+                  oxygenStatus === 'normal' ? 'bg-green-500' : 
+                  oxygenStatus === 'high' ? 'bg-yellow-500' : 'bg-red-500'
                 }`}></span>
                 {getStatusText(oxygenStatus)}
               </p>
