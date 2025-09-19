@@ -44,7 +44,7 @@ def feed():
     pwm_feed.ChangeDutyCycle(0)
     time.sleep(0.5)
     pwm_feed.ChangeDutyCycle(FIXED_DUTY_2)
-    time.sleep(4)
+    time.sleep(2)
     pwm_feed.ChangeDutyCycle(0)
     print(f"[完成] 餵食 {ESTIMATED_GRAM} g @ {datetime.now().isoformat()}")
     return ESTIMATED_GRAM
@@ -66,11 +66,11 @@ def feed_until_weight(target_grams, max_loops=20):
             break
 
         pwm_feed.ChangeDutyCycle(FIXED_DUTY)
-        time.sleep(3)
+        time.sleep(2)
         pwm_feed.ChangeDutyCycle(0)
         time.sleep(0.5)
         pwm_feed.ChangeDutyCycle(FIXED_DUTY_2)
-        time.sleep(3)
+        time.sleep(2)
         pwm_feed.ChangeDutyCycle(0)
         time.sleep(1)
 

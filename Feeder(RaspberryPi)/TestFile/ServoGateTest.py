@@ -16,7 +16,7 @@ pwm.start(0)  # 初始狀態，避免抖動
 pwm.ChangeDutyCycle(2) # 關廚餘閘門
 time.sleep(0.5)
 pwm.ChangeDutyCycle(0) # 開廚餘閘門
-time.sleep(6)
+time.sleep(2)
 pwm.ChangeDutyCycle(12)
 time.sleep(0.5)
 pwm.ChangeDutyCycle(0)
