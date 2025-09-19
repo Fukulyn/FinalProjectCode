@@ -50,7 +50,7 @@ export default function HealthMonitor() {
     switch (type) {
       case 'temperature':
         if (isDog) {
-          return value > 39.2 ? 'high' : value < 38.3 ? 'low' : 'normal';
+          return value > 39.2 ? 'high' : value < 3? 'low' : 'normal';
         } else {
           return value > 39.5 ? 'high' : value < 38.1 ? 'low' : 'normal';
         }
